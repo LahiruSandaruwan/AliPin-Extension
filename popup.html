@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { 
+      width: 340px; 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      padding: 15px; 
+      margin: 0; 
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h3 { 
+      margin-top: 0; 
+      color: #E60023; 
+      font-size: 18px;
+      border-bottom: 2px solid #e1e1e1;
+      padding-bottom: 8px;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label { 
+      font-size: 12px; 
+      font-weight: bold; 
+      display: block;
+      margin-bottom: 4px;
+    }
+    input[type="text"], textarea, select { 
+      width: 100%; 
+      padding: 8px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px; 
+      box-sizing: border-box; 
+      font-size: 13px;
+    }
+    textarea { 
+      height: 75px; 
+      resize: none; 
+    }
+    .btn { 
+      background: #E60023; 
+      color: white; 
+      border: none; 
+      padding: 10px; 
+      width: 100%; 
+      border-radius: 5px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      font-size: 14px;
+      margin-top: 5px;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #b8001c;
+    }
+    .btn-secondary {
+      background: #555;
+      margin-top: 8px;
+    }
+    .btn-secondary:hover {
+      background: #333;
+    }
+    .char-count {
+      float: right;
+      font-weight: normal;
+      color: #666;
+    }
+    .badge {
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 12px;
+      background-color: #f0f0f0;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+    .badge.winning {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .settings-panel {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 2px dashed #e1e1e1;
+    }
+    .settings-title {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #E60023;
+    }
+  </style>
+</head>
+<body>
+  <h3>AliPin Assistant</h3>
+  
+  <div id="winningBadge" class="badge">Analyzing Niche Strength...</div>
+
+  <div class="form-group">
+    <label for="prodTitle">Product Title:</label>
+    <input type="text" id="prodTitle" placeholder="Loading title..." readonly>
+  </div>
+  
+  <div class="form-group">
+    <label for="linkRouting">Link Routing Strategy:</label>
+    <select id="linkRouting">
+      <option value="direct">Direct Affiliate Link</option>
+      <option value="bridge">Landing Page/Bridge Link (Safe Mode)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="affLink">Generated Link to Pin:</label>
+    <input type="text" id="affLink" placeholder="Generating link..." readonly>
+  </div>
+  
+  <div class="form-group">
+    <label for="pinDesc">Pinterest Description: <span id="charCount" class="char-count">0/500</span></label>
+    <textarea id="pinDesc" maxlength="500"></textarea>
+  </div>
+  
+  <button id="btnPin" class="btn">Create Pinterest Pin</button>
+
+  <!-- Extension Settings Panel -->
+  <div class="settings-panel">
+    <div class="settings-title">⚙️ Extension Settings</div>
+    
+    <div class="form-group">
+      <label for="trackingId">AliExpress Tracking ID:</label>
+      <input type="text" id="trackingId" placeholder="e.g. your_tracking_id">
+    </div>
+
+    <div class="form-group" id="bridgeLinkGroup" style="display: none;">
+      <label for="bridgeUrl">Bridge/Landing Page URL:</label>
+      <input type="text" id="bridgeUrl" placeholder="e.g. https://linktr.ee/yourname">
+    </div>
+
+    <button id="btnSave" class="btn btn-secondary">Save Settings</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

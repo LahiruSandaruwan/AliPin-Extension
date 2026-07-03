@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "AliPin - AliExpress to Pinterest Affiliate Assistant",
+  "version": "1.0.0",
+  "description": "Generate AliExpress affiliate links and create Pinterest pins instantly.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.aliexpress.com/item/*",
+        "*://*.aliexpress.com/i/*",
+        "*://*.aliexpress.com/w/*",
+        "*://*.aliexpress.com/category/*",
+        "*://*.aliexpress.com/store/*",
+        "*://*.aliexpress.us/item/*",
+        "*://*.aliexpress.us/i/*",
+        "*://*.aliexpress.us/w/*",
+        "*://*.aliexpress.us/category/*",
+        "*://*.aliexpress.us/store/*",
+        "*://*.aliexpress.ru/item/*",
+        "*://*.aliexpress.ru/i/*",
+        "*://*.aliexpress.ru/w/*",
+        "*://*.aliexpress.ru/category/*",
+        "*://*.aliexpress.ru/store/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}

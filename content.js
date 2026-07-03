@@ -1,0 +1,289 @@
+// --- 1. ITEM PAGE SCRAPING LOGIC ---
+function getProductDetails() {
+  const titleSelectors = ['h1[data-pl="product-title"]', '.pdp-info-title', '.product-title-text', 'h1', '.product-title'];
+  let title = '';
+  for (const selector of titleSelectors) {
+    const el = document.querySelector(selector);
+    if (el && el.innerText && el.innerText.trim() !== '') {
+      title = el.innerText.trim();
+      break;
+    }
+  }
+  if (!title) title = document.title.replace(/- AliExpress.*$/i, '').trim();
+
+  const imageSelectors = ['.pdp-info-main-img img', '.magnifier-image', '.image-view-magnifier-wrap img', '.item-detail-img', 'img[src*="kf/"]'];
+  let imageUrl = '';
+  for (const selector of imageSelectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      let srcFound = el.getAttribute('srcset') ? el.getAttribute('srcset').split(',')[0].trim().split(' ')[0] : (el.getAttribute('data-src') || el.getAttribute('src'));
+      if (srcFound) {
+        if (srcFound.startsWith('//')) srcFound = 'https:' + srcFound;
+        srcFound = srcFound.replace(/_[0-9]+x[0-9]+[a-zA-Z0-9]*\.[a-zA-Z0-9]+(\.webp)?$/i, '');
+        imageUrl = srcFound;
+        break;
+      }
+    }
+  }
+
+  let rating = 0;
+  const ratingSelectors = ['.overview-rating-average', 'span[data-pl="product-reviewer"] strong', '.review-title', '.rating-value'];
+  for (const selector of ratingSelectors) {
+    const el = document.querySelector(selector);
+    if (el && el.innerText) {
+      const match = el.innerText.match(/(\d+\.\d+)/);
+      if (match) { rating = parseFloat(match[1]); break; }
+    }
+  }
+
+  let orders = 0;
+  const ordersSelectors = ['.product-reviewer-sold', '.format-sold-count', 'span.black-link', 'div[data-pl="product-reviewer"] span', '.product-reviewer span'];
+  for (const selector of ordersSelectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const el of elements) {
+      const text = el.innerText ? el.innerText.toLowerCase() : '';
+      if (text.includes('sold') || text.includes('order')) {
+        const match = text.replace(/,/g, '').match(/(\d+)/);
+        if (match) {
+          orders = parseInt(match[1]);
+          if (text.includes('k')) orders *= 1000;
+          if (text.includes('m')) orders *= 1000000;
+          break;
+        }
+      }
+    }
+    if (orders > 0) break;
+  }
+  
+  const productUrl = window.location.href.split('?')[0].split('#')[0];
+  return { title, imageUrl, productUrl, rating, orders };
+}
+
+// Listen for popup messages (used on Item pages)
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getProductData") {
+    sendResponse(getProductDetails());
+  }
+  return true; 
+});
+
+
+// --- 2. SEARCH PAGE PROSPECTING LOGIC ---
+const LEGAL_TAGS = " #aliexpressfinds #viralgadgets #affiliate #ad";
+
+function generateHashtags(title) {
+    let tags = new Set([]);
+    const titleLower = title.toLowerCase();
+    if (titleLower.includes('home') || titleLower.includes('kitchen') || titleLower.includes('decor')) tags.add('#homedecor');
+    if (titleLower.includes('gadget') || titleLower.includes('electronic') || titleLower.includes('usb')) tags.add('#techfinds');
+    if (titleLower.includes('beauty') || titleLower.includes('makeup')) tags.add('#beautyhacks');
+    if (titleLower.includes('toy') || titleLower.includes('baby') || titleLower.includes('kids')) tags.add('#momlife');
+    if (titleLower.includes('car') || titleLower.includes('auto')) tags.add('#caraccessories');
+    tags.add('#tiktokmademebuyit');
+    return Array.from(tags).slice(0, 3).join(' ');
+}
+
+// Generates an optimized Pinterest Board Name based on product keywords
+function getBoardName(title) {
+    const titleLower = title.toLowerCase();
+    if (titleLower.includes('home') || titleLower.includes('kitchen') || titleLower.includes('decor')) return 'Home Decor Finds';
+    if (titleLower.includes('gadget') || titleLower.includes('electronic') || titleLower.includes('usb')) return 'Tech Gadgets';
+    if (titleLower.includes('beauty') || titleLower.includes('makeup')) return 'Beauty Hacks';
+    if (titleLower.includes('toy') || titleLower.includes('baby') || titleLower.includes('kids')) return 'Kids & Mom Life';
+    if (titleLower.includes('car') || titleLower.includes('auto')) return 'Car Accessories';
+    return 'Viral Finds';
+}
+
+function enforceDisclosures(description) {
+    let text = description.replace(LEGAL_TAGS, "").trim();
+    let combined = text + LEGAL_TAGS;
+    if (combined.length > 500) {
+      const space = 500 - LEGAL_TAGS.length - 3;
+      text = text.substring(0, space) + "...";
+      combined = text + LEGAL_TAGS;
+    }
+    return combined;
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(err => fallbackCopyTextToClipboard(text));
+  } else {
+      fallbackCopyTextToClipboard(text);
+  }
+}
+
+function fallbackCopyTextToClipboard(text) {
+  var textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try { document.execCommand('copy'); } catch (err) { console.error('Fallback copy failed', err); }
+  document.body.removeChild(textArea);
+}
+
+function triggerQuickPin(title, imageUrl, productUrl) {
+    // 1. Auto-Copy Board Name to Clipboard using Robust Fallback
+    const boardName = getBoardName(title);
+    copyToClipboard(boardName);
+
+    // 2. Load settings and open Pinterest
+    chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl'], (result) => {
+        let trackingId = result.trackingId || '_pz9sEiR'; // Default to a valid format example
+        let routingChoice = result.linkRouting || 'direct';
+        let finalLink = "";
+        
+        if (routingChoice === 'direct') {
+          // Fix: Use raw URL append method instead of broken s.click placeholder
+          try {
+            const urlObj = new URL(productUrl);
+            urlObj.searchParams.set('aff_platform', 'portals-promotion');
+            urlObj.searchParams.set('sk', trackingId);
+            finalLink = urlObj.toString();
+          } catch(e) {
+            finalLink = productUrl + (productUrl.includes('?') ? '&' : '?') + `aff_platform=portals-promotion&sk=${trackingId}`;
+          }
+        } else {
+          let rootUrl = result.bridgeUrl || "https://linktr.ee/yourprofile";
+          const match = productUrl.match(/\/(\d+)\.html/);
+          const productId = match ? match[1] : 'ali_item';
+          finalLink = rootUrl + (rootUrl.includes('?') ? '&' : '?') + `product=${productId}`;
+        }
+        
+        const autoTags = generateHashtags(title);
+        const initialDesc = `Check out this amazing find on AliExpress! 😍 👇\n\n${autoTags}`;
+        const pinDesc = enforceDisclosures(initialDesc);
+        
+        let pinTitleEnc = encodeURIComponent(title);
+        let pinLinkEnc = encodeURIComponent(finalLink);
+        let pinImageEnc = encodeURIComponent(imageUrl);
+        let pinDescEnc = encodeURIComponent(pinDesc);
+
+        let pinterestUrl = `https://www.pinterest.com/pin/create/button/?url=${pinLinkEnc}&media=${pinImageEnc}&description=${pinDescEnc}&title=${pinTitleEnc}`;
+        window.open(pinterestUrl, '_blank', 'width=800,height=600');
+    });
+}
+
+function processCard(card, itemUrl) {
+  const text = card.innerText.toLowerCase();
+  let orders = 0;
+  
+  // Extract sales from card text
+  const match = text.match(/(\d+[,.]?\d*[km]?)\+?\s*(sold|orders)/i);
+  if (match) {
+    let numStr = match[1].replace(/,/g, '');
+    let mult = 1;
+    if (numStr.includes('k')) { mult = 1000; numStr = numStr.replace('k', ''); }
+    if (numStr.includes('m')) { mult = 1000000; numStr = numStr.replace('m', ''); }
+    orders = parseFloat(numStr) * mult;
+  }
+  
+  if (orders >= 500) {
+    // Highlight Card
+    card.style.border = "3px solid #28a745";
+    card.style.boxShadow = "0 4px 8px rgba(40,167,69,0.3)";
+    card.style.position = "relative";
+    
+    // Add Badge
+    const badge = document.createElement('div');
+    badge.innerText = "🔥 Winning Niche";
+    badge.style.position = "absolute";
+    badge.style.top = "10px";
+    badge.style.left = "10px";
+    badge.style.backgroundColor = "#28a745";
+    badge.style.color = "white";
+    badge.style.padding = "4px 8px";
+    badge.style.borderRadius = "4px";
+    badge.style.fontWeight = "bold";
+    badge.style.zIndex = "100";
+    badge.style.fontSize = "12px";
+    card.appendChild(badge);
+    
+    // Extract Title & Image from card
+    let title = "";
+    const titleEl = card.querySelector('h1, h3, [class*="title--"]');
+    if (titleEl) title = titleEl.innerText.trim();
+    if (!title) {
+       const textNodes = Array.from(card.querySelectorAll('*')).map(el => el.innerText ? el.innerText.trim() : "").filter(t => t.length > 20);
+       if (textNodes.length > 0) title = textNodes[0];
+    }
+    
+    let imageUrl = "";
+    const imgEl = card.querySelector('img');
+    if (imgEl) {
+       imageUrl = imgEl.src || imgEl.dataset.src || "";
+       if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
+       imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+    }
+    
+    // Add "Quick Pin" Button
+    const btn = document.createElement('button');
+    btn.innerText = "📌 Quick Pin";
+    btn.style.position = "absolute";
+    btn.style.bottom = "10px";
+    btn.style.right = "10px";
+    btn.style.backgroundColor = "#E60023";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "8px 12px";
+    btn.style.borderRadius = "20px";
+    btn.style.fontWeight = "bold";
+    btn.style.cursor = "pointer";
+    btn.style.zIndex = "100";
+    btn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+    
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Show visual feedback that it was copied
+      const originalText = btn.innerText;
+      btn.innerText = "📋 Copied!";
+      btn.style.backgroundColor = "#28a745";
+      setTimeout(() => { 
+        btn.innerText = originalText; 
+        btn.style.backgroundColor = "#E60023";
+      }, 2000);
+      
+      triggerQuickPin(title, imageUrl, itemUrl);
+    };
+    
+    card.appendChild(btn);
+  }
+}
+
+function findProductCards() {
+  const itemLinks = document.querySelectorAll('a[href*="/item/"]');
+  
+  itemLinks.forEach(link => {
+    // Find the main card container
+    let card = link.closest('div[class*="outWrapper"], div[class*="list--gallery"], div[class*="search-card-item"]');
+    
+    if (!card) {
+       let parent = link.parentElement;
+       for (let i = 0; i < 5; i++) {
+           if (parent && parent.innerText && (parent.innerText.toLowerCase().includes('sold') || parent.innerText.toLowerCase().includes('order'))) {
+               card = parent;
+               break;
+           }
+           if (parent) parent = parent.parentElement;
+       }
+    }
+    
+    if (card && !card.dataset.alipinProcessed) {
+       card.dataset.alipinProcessed = "true";
+       processCard(card, link.href);
+    }
+  });
+}
+
+// Check which page we are on
+if (window.location.href.includes('/item/') || window.location.href.includes('/i/')) {
+    // Item Page: Do nothing (wait for popup message)
+} else {
+    // Search/Category Page: Run Prospecting Mode
+    setInterval(findProductCards, 2000);
+}
