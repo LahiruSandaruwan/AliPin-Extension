@@ -100,6 +100,9 @@
 <body>
   <h3>AliPin Assistant</h3>
   
+  <div id="errorSection" style="display:none; color:#E60023; padding:20px; text-align:center; font-weight:bold;"></div>
+  
+  <div id="productSection">
   <div id="winningBadge" class="badge">Analyzing Niche Strength...</div>
 
   <div class="form-group">
@@ -116,8 +119,8 @@
   </div>
 
   <div class="form-group">
-    <label for="affLink">Generated Link to Pin:</label>
-    <input type="text" id="affLink" placeholder="Generating link..." readonly>
+    <label for="affLink">Generated Link to Pin (You can edit/paste here):</label>
+    <input type="text" id="affLink" placeholder="Generating link...">
   </div>
   
   <div class="form-group">
@@ -126,6 +129,7 @@
   </div>
   
   <button id="btnPin" class="btn">Create Pinterest Pin</button>
+  </div>
 
   <!-- Extension Settings Panel -->
   <div class="settings-panel">

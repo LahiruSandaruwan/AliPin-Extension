@@ -11,19 +11,29 @@ function getProductDetails() {
   }
   if (!title) title = document.title.replace(/- AliExpress.*$/i, '').trim();
 
-  const imageSelectors = ['.pdp-info-main-img img', '.magnifier-image', '.image-view-magnifier-wrap img', '.item-detail-img', 'img[src*="kf/"]'];
   let imageUrl = '';
-  for (const selector of imageSelectors) {
-    const el = document.querySelector(selector);
-    if (el) {
-      let srcFound = el.getAttribute('srcset') ? el.getAttribute('srcset').split(',')[0].trim().split(' ')[0] : (el.getAttribute('data-src') || el.getAttribute('src'));
-      if (srcFound) {
-        if (srcFound.startsWith('//')) srcFound = 'https:' + srcFound;
-        srcFound = srcFound.replace(/_[0-9]+x[0-9]+[a-zA-Z0-9]*\.[a-zA-Z0-9]+(\.webp)?$/i, '');
-        imageUrl = srcFound;
-        break;
+  const ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg && ogImg.content) {
+      imageUrl = ogImg.content;
+  }
+  
+  if (!imageUrl || imageUrl.includes('logo')) {
+      const imageSelectors = ['.pdp-info-main-img img', '.magnifier-image', '.image-view-magnifier-wrap img', '.item-detail-img', 'img[src*="kf/"]'];
+      for (const selector of imageSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          let srcFound = el.getAttribute('srcset') ? el.getAttribute('srcset').split(',')[0].trim().split(' ')[0] : (el.getAttribute('data-src') || el.getAttribute('src'));
+          if (srcFound && !srcFound.includes('data:image') && !srcFound.includes('.gif') && !srcFound.includes('logo')) {
+            if (srcFound.startsWith('//')) srcFound = 'https:' + srcFound;
+            imageUrl = srcFound;
+            break;
+          }
+        }
       }
-    }
+  }
+  
+  if (imageUrl) {
+      imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
   }
 
   let rating = 0;
@@ -54,9 +64,21 @@ function getProductDetails() {
     }
     if (orders > 0) break;
   }
+  let sClickUrl = '';
+  const inputs = document.querySelectorAll('input, textarea');
+  for (const input of inputs) {
+    if (input.value && input.value.includes('s.click.aliexpress.com')) {
+      sClickUrl = input.value.trim();
+      break;
+    }
+  }
+  if (!sClickUrl) {
+     const match = document.body.innerHTML.match(/(https:\/\/s\.click\.aliexpress\.com\/e\/_[a-zA-Z0-9]+)/);
+     if (match) sClickUrl = match[1];
+  }
   
   const productUrl = window.location.href.split('?')[0].split('#')[0];
-  return { title, imageUrl, productUrl, rating, orders };
+  return { title, imageUrl, productUrl, rating, orders, sClickUrl };
 }
 
 // Listen for popup messages (used on Item pages)
@@ -69,7 +91,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 
 // --- 2. SEARCH PAGE PROSPECTING LOGIC ---
-const LEGAL_TAGS = " #aliexpressfinds #viralgadgets #affiliate #ad";
+const LEGAL_TAGS = " #musthaves #viralgadgets #affiliate #ad";
 
 function generateHashtags(title) {
     let tags = new Set([]);
@@ -126,10 +148,17 @@ function fallbackCopyTextToClipboard(text) {
   document.body.removeChild(textArea);
 }
 
+function generateSeoTitle(rawTitle) {
+    const words = rawTitle.split(/\s+/);
+    let short = words.slice(0, 6).join(' ').replace(/[,|\-].*$/, '').trim();
+    short = short.replace(/\b\w/g, l => l.toUpperCase());
+    return short.length > 60 ? short.substring(0, 60).trim() : short;
+}
+
 function triggerQuickPin(title, imageUrl, productUrl) {
-    // 1. Auto-Copy Board Name to Clipboard using Robust Fallback
-    const boardName = getBoardName(title);
-    copyToClipboard(boardName);
+    // 1. Auto-Copy Title to Clipboard (since Pinterest blocks title via URL)
+    let rawTitle = generateSeoTitle(title);
+    copyToClipboard(rawTitle);
 
     // 2. Load settings and open Pinterest
     chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl'], (result) => {
@@ -155,10 +184,25 @@ function triggerQuickPin(title, imageUrl, productUrl) {
         }
         
         const autoTags = generateHashtags(title);
-        const initialDesc = `Check out this amazing find on AliExpress! 😍 👇\n\n${autoTags}`;
-        const pinDesc = enforceDisclosures(initialDesc);
         
-        let pinTitleEnc = encodeURIComponent(title);
+        function generateSmartDescription(productTitle) {
+            const words = productTitle.split(/\s+/);
+            const shortTitle = words.slice(0, 7).join(' ').replace(/[,|\-].*$/, '').trim();
+            const templates = [
+                `Looking for the perfect ${shortTitle}? This is one of our absolute favorite finds! 😍 Grab yours today before they sell out! 👇`,
+                `You definitely need this ${shortTitle} in your life! 🔥 Amazing quality and super useful. Get the best deal here 👇`,
+                `Upgrade your lifestyle with this ${shortTitle}! ✨ We absolutely love this find. Click through to see more details! 👇`,
+                `Check out this incredible ${shortTitle}! 🛒 Highly recommended by buyers and currently trending. Don't miss out! 👇`
+            ];
+            return templates[Math.floor(Math.random() * templates.length)];
+        }
+        
+        let rawTitle = title;
+        if (rawTitle.length > 95) rawTitle = rawTitle.substring(0, 95) + "...";
+        
+        const initialDesc = "📌 " + rawTitle + "\n\n" + generateSmartDescription(title) + `\n\n${autoTags}`;
+        const pinDesc = enforceDisclosures(initialDesc);
+        let pinTitleEnc = encodeURIComponent(rawTitle);
         let pinLinkEnc = encodeURIComponent(finalLink);
         let pinImageEnc = encodeURIComponent(imageUrl);
         let pinDescEnc = encodeURIComponent(pinDesc);
@@ -213,9 +257,25 @@ function processCard(card, itemUrl) {
     }
     
     let imageUrl = "";
-    const imgEl = card.querySelector('img');
-    if (imgEl) {
-       imageUrl = imgEl.src || imgEl.dataset.src || "";
+    const allImgs = Array.from(card.querySelectorAll('img'));
+    
+    // First try to find a high-quality product image (usually on kf/ CDN)
+    let bestImg = null;
+    for (let img of allImgs) {
+       let src = img.src || img.dataset.src || "";
+       // Skip UI icons, tracking pixels, and lazy loaders
+       if (src.includes('data:image') || src.includes('.gif') || src.includes('lazyload') || src.includes('.svg') || src.includes('logo')) {
+           continue;
+       }
+       if (src.includes('kf/')) {
+           bestImg = img;
+           break; // Found the AliExpress CDN image
+       }
+       if (!bestImg) bestImg = img;
+    }
+    
+    if (bestImg) {
+       imageUrl = bestImg.src || bestImg.dataset.src || "";
        if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
        imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
     }
@@ -256,7 +316,7 @@ function processCard(card, itemUrl) {
 }
 
 function findProductCards() {
-  const itemLinks = document.querySelectorAll('a[href*="/item/"]');
+  const itemLinks = document.querySelectorAll('a[href*="/item/"], a[href*="/p/"]');
   
   itemLinks.forEach(link => {
     // Find the main card container
@@ -278,12 +338,79 @@ function findProductCards() {
        processCard(card, link.href);
     }
   });
+
+  // Fallback for Portals: Find cards via 'Promote now' buttons
+  if (window.location.hostname.includes('portals.aliexpress.com')) {
+      const allButtons = document.querySelectorAll('button, a, div[role="button"]');
+      allButtons.forEach(btn => {
+          if (btn.innerText && btn.innerText.toLowerCase().includes('promote now')) {
+              let card = btn;
+              // Traverse up to find a container with an image
+              for (let i = 0; i < 6; i++) {
+                  if (card.parentElement) {
+                      card = card.parentElement;
+                      if (card.querySelector('img') && card.innerText.includes('sold')) {
+                          break;
+                      }
+                  }
+              }
+              
+              if (card && !card.dataset.alipinProcessed) {
+                  card.dataset.alipinProcessed = "true";
+                  // Try to find product URL from any link inside the card
+                  let productUrl = window.location.href; // default to current page
+                  const linksInCard = card.querySelectorAll('a');
+                  for (let link of linksInCard) {
+                      if (link.href && (link.href.includes('aliexpress') || link.href.includes('item'))) {
+                          productUrl = link.href;
+                          break;
+                      }
+                  }
+                  processCard(card, productUrl);
+              }
+          }
+      });
+  }
+}
+
+function extractTrackingIdFromPortals() {
+    // Try to find tracking ID from common places in Portals (like text, generated links, etc)
+    const pageText = document.body.innerText;
+    // Look for standard AliExpress tracking ID pattern like _pz9sEiR
+    const match = pageText.match(/\b(_[a-zA-Z0-9]{5,10})\b/);
+    if (match) {
+        chrome.storage.local.get(['trackingId'], (result) => {
+            if (result.trackingId !== match[1]) {
+                chrome.storage.local.set({ trackingId: match[1] });
+                console.log("AliPin: Auto-saved Tracking ID:", match[1]);
+            }
+        });
+    }
+    
+    // Also look for generated affiliate links in inputs
+    const inputs = document.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+        if (input.value && (input.value.includes('sk=') || input.value.includes('aff_short_key='))) {
+            let idMatch = input.value.match(/(?:sk|aff_short_key)=([^&]+)/);
+            if (idMatch) {
+                chrome.storage.local.get(['trackingId'], (result) => {
+                    if (result.trackingId !== idMatch[1]) {
+                        chrome.storage.local.set({ trackingId: idMatch[1] });
+                        console.log("AliPin: Auto-saved Tracking ID from link:", idMatch[1]);
+                    }
+                });
+            }
+        }
+    });
 }
 
 // Check which page we are on
 if (window.location.href.includes('/item/') || window.location.href.includes('/i/')) {
     // Item Page: Do nothing (wait for popup message)
 } else {
-    // Search/Category Page: Run Prospecting Mode
+    // Search/Category/Portals Page: Run Prospecting Mode
+    if (window.location.hostname.includes('portals.aliexpress.com')) {
+        setInterval(extractTrackingIdFromPortals, 3000);
+    }
     setInterval(findProductCards, 2000);
 }

@@ -28,7 +28,8 @@
         "*://*.aliexpress.ru/i/*",
         "*://*.aliexpress.ru/w/*",
         "*://*.aliexpress.ru/category/*",
-        "*://*.aliexpress.ru/store/*"
+        "*://*.aliexpress.ru/store/*",
+        "*://portals.aliexpress.com/*"
       ],
       "js": ["content.js"]
     }
