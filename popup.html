@@ -2,150 +2,636 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <!-- Import Outfit and Inter fonts from Google Fonts for a highly premium look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
-    body { 
-      width: 340px; 
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-      padding: 15px; 
-      margin: 0; 
-      background-color: #f9f9f9;
-      color: #333;
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f0c1b 0%, #1e102f 100%);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --primary: #E60023; /* Pinterest Red */
+      --primary-hover: #b8001c;
+      --primary-glow: rgba(230, 0, 35, 0.35);
+      --accent-glow: rgba(255, 74, 110, 0.25);
+      --success: #00E676; /* Emerald Green */
+      --success-bg: rgba(0, 230, 118, 0.15);
+      --success-border: rgba(0, 230, 118, 0.3);
+      --warning: #FFAB00;
+      --error: #FF3D00;
+      --error-bg: rgba(255, 61, 0, 0.15);
+      --text-main: #FFFFFF;
+      --text-sub: #9E9EAE;
+      --card-bg: rgba(255, 255, 255, 0.04);
     }
-    h3 { 
-      margin-top: 0; 
-      color: #E60023; 
-      font-size: 18px;
-      border-bottom: 2px solid #e1e1e1;
-      padding-bottom: 8px;
+
+    body { 
+      width: 360px; 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      padding: 0; 
+      margin: 0; 
+      overflow-x: hidden;
+      min-height: 520px;
+    }
+
+    /* Outer Wrapper for Glassmorphism feel */
+    .app-container {
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    h3.logo { 
+      font-family: 'Outfit', sans-serif;
+      margin: 0 0 16px 0; 
+      color: var(--text-main); 
+      font-size: 22px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    h3.logo span {
+      background: linear-gradient(90deg, #ff4a6e 0%, #E60023 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Tabs Layout */
+    .tabs-nav {
+      display: flex;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 16px;
+      gap: 2px;
+    }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      padding: 8px 0;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: 'Outfit', sans-serif;
       text-align: center;
     }
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .tab-btn.active {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.30s ease;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .form-group {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     label { 
-      font-size: 12px; 
-      font-weight: bold; 
+      font-size: 11px; 
+      font-weight: 600; 
       display: block;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
     input[type="text"], textarea, select { 
       width: 100%; 
-      padding: 8px; 
-      border: 1px solid #ccc; 
-      border-radius: 4px; 
+      padding: 10px 12px; 
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--glass-border); 
+      border-radius: 10px; 
       box-sizing: border-box; 
       font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus { 
+      border-color: rgba(230, 0, 35, 0.6);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      background: rgba(0, 0, 0, 0.35);
     }
     textarea { 
-      height: 75px; 
+      height: 70px; 
       resize: none; 
     }
+
+    /* Buttons */
     .btn { 
-      background: #E60023; 
+      background: linear-gradient(135deg, #ff4a6e 0%, #E60023 100%);
       color: white; 
       border: none; 
-      padding: 10px; 
+      padding: 11px; 
       width: 100%; 
-      border-radius: 5px; 
+      border-radius: 10px; 
       cursor: pointer; 
-      font-weight: bold; 
+      font-weight: 700; 
       font-size: 14px;
-      margin-top: 5px;
-      transition: background 0.2s;
+      font-family: 'Outfit', sans-serif;
+      box-shadow: 0 4px 14px var(--primary-glow);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .btn:hover {
-      background: #b8001c;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(230, 0, 35, 0.5);
+    }
+    .btn:active {
+      transform: translateY(1px);
     }
     .btn-secondary {
-      background: #555;
-      margin-top: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--glass-border);
+      box-shadow: none;
     }
     .btn-secondary:hover {
-      background: #333;
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
+
     .char-count {
       float: right;
       font-weight: normal;
-      color: #666;
+      color: var(--text-sub);
     }
+    
     .badge {
-      padding: 6px 10px;
-      border-radius: 4px;
+      padding: 8px 12px;
+      border-radius: 10px;
       font-size: 12px;
-      font-weight: bold;
+      font-weight: 600;
       text-align: center;
-      margin-bottom: 12px;
-      background-color: #f0f0f0;
-      color: #666;
-      border: 1px solid #ddd;
+      margin-bottom: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      color: var(--text-sub);
     }
     .badge.winning {
-      background-color: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid var(--success-border);
+      box-shadow: 0 0 10px rgba(0, 230, 118, 0.1);
     }
-    .settings-panel {
-      margin-top: 20px;
-      padding-top: 15px;
-      border-top: 2px dashed #e1e1e1;
+
+    /* Collapsible Settings Panel inside Assistant */
+    .collapsible-settings {
+      margin-top: 16px;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 12px;
     }
-    .settings-title {
+    .collapsible-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      font-family: 'Outfit', sans-serif;
+    }
+    .collapsible-content {
+      margin-top: 12px;
+      display: none;
+    }
+    .collapsible-content.open {
+      display: block;
+    }
+
+    /* Queue List styling */
+    .queue-list {
+      max-height: 310px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      padding-right: 2px;
+    }
+    /* Custom Scrollbar for premium feel */
+    .queue-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .queue-list::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 2px;
+    }
+    .queue-list::-webkit-scrollbar-thumb {
+      background: var(--glass-border);
+      border-radius: 2px;
+    }
+
+    .queue-item {
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+    .queue-thumb {
+      width: 42px;
+      height: 42px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: rgba(0,0,0,0.2);
+    }
+    .queue-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .queue-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .queue-board {
+      font-size: 10px;
+      color: var(--text-sub);
+    }
+    .queue-status-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .queue-status-badge.queued {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-sub);
+    }
+    .queue-status-badge.processing {
+      background: rgba(255, 171, 0, 0.15);
+      color: var(--warning);
+    }
+    .queue-status-badge.completed {
+      background: var(--success-bg);
+      color: var(--success);
+    }
+    .queue-status-badge.failed {
+      background: var(--error-bg);
+      color: var(--error);
+      cursor: help;
+    }
+    .queue-remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      cursor: pointer;
       font-size: 14px;
-      font-weight: bold;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .queue-remove-btn:hover {
+      color: var(--error);
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Manual Pin Now button on each queue card */
+    .queue-pin-btn {
+      background: linear-gradient(135deg, #ff4a6e 0%, #E60023 100%);
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px var(--primary-glow);
+      flex-shrink: 0;
+    }
+    .queue-pin-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(230,0,35,0.45);
+    }
+    .queue-pin-btn:active {
+      transform: translateY(0);
+    }
+    .queue-pin-btn:disabled {
+      background: rgba(255,255,255,0.1);
+      box-shadow: none;
+      color: var(--text-sub);
+      cursor: default;
+      transform: none;
+    }
+
+    /* Queue tab header bar */
+    .queue-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       margin-bottom: 10px;
-      color: #E60023;
+    }
+    .queue-header-stat {
+      font-size: 11px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+    .queue-header-stat strong {
+      color: var(--text-main);
+      font-weight: 700;
+    }
+    .empty-queue {
+      text-align: center;
+      color: var(--text-sub);
+      font-size: 13px;
+      padding: 40px 0;
+    }
+
+    /* Switch Styling */
+    .switch-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+    .switch-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .switch-desc {
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255,255,255,0.1);
+      transition: .3s;
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: var(--success);
+      border-color: rgba(0, 230, 118, 0.4);
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Autopilot Dashboard stats */
+    .autopilot-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    .error-sec {
+      background: var(--error-bg);
+      border: 1px solid rgba(255, 61, 0, 0.3);
+      color: #ff8a80;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-bottom: 14px;
+      font-weight: 500;
+      line-height: 1.4;
     }
   </style>
 </head>
 <body>
-  <h3>AliPin Assistant</h3>
-  
-  <div id="errorSection" style="display:none; color:#E60023; padding:20px; text-align:center; font-weight:bold;"></div>
-  
-  <div id="productSection">
-  <div id="winningBadge" class="badge">Analyzing Niche Strength...</div>
-
-  <div class="form-group">
-    <label for="prodTitle">Product Title:</label>
-    <input type="text" id="prodTitle" placeholder="Loading title..." readonly>
-  </div>
-  
-  <div class="form-group">
-    <label for="linkRouting">Link Routing Strategy:</label>
-    <select id="linkRouting">
-      <option value="direct">Direct Affiliate Link</option>
-      <option value="bridge">Landing Page/Bridge Link (Safe Mode)</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label for="affLink">Generated Link to Pin (You can edit/paste here):</label>
-    <input type="text" id="affLink" placeholder="Generating link...">
-  </div>
-  
-  <div class="form-group">
-    <label for="pinDesc">Pinterest Description: <span id="charCount" class="char-count">0/500</span></label>
-    <textarea id="pinDesc" maxlength="500"></textarea>
-  </div>
-  
-  <button id="btnPin" class="btn">Create Pinterest Pin</button>
-  </div>
-
-  <!-- Extension Settings Panel -->
-  <div class="settings-panel">
-    <div class="settings-title">⚙️ Extension Settings</div>
+  <div class="app-container">
+    <h3 class="logo">📌 <span>AliPin Pro</span></h3>
     
-    <div class="form-group">
-      <label for="trackingId">AliExpress Tracking ID:</label>
-      <input type="text" id="trackingId" placeholder="e.g. your_tracking_id">
+    <!-- Tab Navigation Headers -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-assistant">Assistant</button>
+      <button class="tab-btn" data-tab="tab-queue">Queue (<span id="queueCountBadge">0</span>)</button>
+      <button class="tab-btn" data-tab="tab-autopilot">Autopilot</button>
     </div>
 
-    <div class="form-group" id="bridgeLinkGroup" style="display: none;">
-      <label for="bridgeUrl">Bridge/Landing Page URL:</label>
-      <input type="text" id="bridgeUrl" placeholder="e.g. https://linktr.ee/yourname">
+    <!-- Error/Notice Display -->
+    <div id="errorSection" class="error-sec" style="display:none;"></div>
+
+    <!-- TAB 1: PRODUCT ASSISTANT -->
+    <div id="tab-assistant" class="tab-content active">
+      <div id="productSection">
+        <div id="winningBadge" class="badge">Analyzing product...</div>
+
+        <div class="form-group">
+          <label for="prodTitle">Product Title:</label>
+          <input type="text" id="prodTitle" placeholder="No product page detected" readonly>
+        </div>
+        
+        <div class="form-group">
+          <label for="linkRouting">Link Routing Strategy:</label>
+          <select id="linkRouting">
+            <option value="direct">Direct Affiliate Link</option>
+            <option value="bridge">Landing Page/Bridge Link</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="affLink">Affiliate Link to Pin:</label>
+          <input type="text" id="affLink" placeholder="Generating link...">
+        </div>
+        
+        <div class="form-group">
+          <label for="pinDesc">Pinterest Description: <span id="charCount" class="char-count">0/500</span></label>
+          <textarea id="pinDesc" maxlength="500"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+          <button id="btnPin" class="btn" style="flex: 2;">Create Pin</button>
+          <button id="btnQueue" class="btn btn-secondary" style="flex: 1; padding: 11px 0;">+ Queue</button>
+        </div>
+      </div>
+
+      <!-- Collapsible Extension Settings -->
+      <div class="collapsible-settings">
+        <div class="collapsible-title" id="settingsToggle">
+          <span>⚙️ General Settings</span>
+          <span id="settingsArrow">▼</span>
+        </div>
+        
+        <div class="collapsible-content" id="settingsContent">
+          <div class="form-group">
+            <label for="trackingId">AliExpress Tracking ID (sk):</label>
+            <input type="text" id="trackingId" placeholder="e.g. your_tracking_id">
+          </div>
+
+          <div class="form-group" id="bridgeLinkGroup" style="display: none;">
+            <label for="bridgeUrl">Bridge/Landing Page URL:</label>
+            <input type="text" id="bridgeUrl" placeholder="e.g. https://linktr.ee/yourname">
+          </div>
+
+          <button id="btnSave" class="btn btn-secondary">Save Settings</button>
+        </div>
+      </div>
     </div>
 
-    <button id="btnSave" class="btn btn-secondary">Save Settings</button>
+    <!-- TAB 2: QUEUE MANAGER -->
+    <div id="tab-queue" class="tab-content">
+      <!-- Queue header stats bar -->
+      <div class="queue-header-bar">
+        <div class="queue-header-stat">Queued: <strong id="queueStatQueued">0</strong> &nbsp;|&nbsp; Done: <strong id="queueStatDone">0</strong> &nbsp;|&nbsp; Failed: <strong id="queueStatFailed">0</strong></div>
+      </div>
+      <div class="queue-list" id="queueListContainer">
+        <!-- Rendered dynamically -->
+        <div class="empty-queue">No items in pinning queue.</div>
+      </div>
+      
+      <button id="btnClearQueue" class="btn btn-secondary">🗑️ Clear Completed &amp; Failed</button>
+    </div>
+
+    <!-- TAB 3: AUTOPILOT SETTINGS -->
+    <div id="tab-autopilot" class="tab-content">
+      <div class="switch-group">
+        <div>
+          <span class="switch-label">Autopilot Sourcing & Pinning</span>
+          <div class="switch-desc">Auto-discovery, source and post daily</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autopilotEnabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="autopilot-stats">
+        <div class="stat-card">
+          <div class="stat-val" id="statQueueCount">0</div>
+          <div class="stat-lbl">Queued Items</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="statCompletedCount">0</div>
+          <div class="stat-lbl">Posted Today</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="sourcingMode">Trends Sourcing Source:</label>
+        <select id="sourcingMode">
+          <option value="trends">Pinterest Trends (trends.pinterest.com)</option>
+          <option value="google">Google Daily Trends RSS (US)</option>
+          <option value="custom">Custom Niches/Keywords list</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="customKeywordsGroup" style="display: none;">
+        <label for="customKeywords">Custom Keywords (comma-separated):</label>
+        <input type="text" id="customKeywords" placeholder="e.g. kitchen gadgets, dog accessories, room lights">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="sourcingLimit">Daily Source Limit:</label>
+          <select id="sourcingLimit">
+            <option value="3">3 items/day</option>
+            <option value="5">5 items/day</option>
+            <option value="10">10 items/day</option>
+            <option value="20">20 items/day</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="postingInterval">Posting Interval:</label>
+          <select id="postingInterval">
+            <option value="1">Every 1 Hour</option>
+            <option value="2">Every 2 Hours</option>
+            <option value="4">Every 4 Hours</option>
+            <option value="8">Every 8 Hours</option>
+            <option value="12">Every 12 Hours</option>
+            <option value="24">Once a Day</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btnTriggerAutopilot" class="btn">🚀 Run Sourcing Autopilot Now</button>
+    </div>
   </div>
 
   <script src="popup.js"></script>

@@ -1,6 +1,6 @@
 // --- 1. ITEM PAGE SCRAPING LOGIC ---
 function getProductDetails() {
-  const titleSelectors = ['h1[data-pl="product-title"]', '.pdp-info-title', '.product-title-text', 'h1', '.product-title'];
+  const titleSelectors = ['h1[data-buy-box-listing-title]', 'h1.wt-text-body-01', 'h1[data-pl="product-title"]', '.pdp-info-title', '.product-title-text', 'h1', '.product-title'];
   let title = '';
   for (const selector of titleSelectors) {
     const el = document.querySelector(selector);
@@ -18,7 +18,7 @@ function getProductDetails() {
   }
   
   if (!imageUrl || imageUrl.includes('logo')) {
-      const imageSelectors = ['.pdp-info-main-img img', '.magnifier-image', '.image-view-magnifier-wrap img', '.item-detail-img', 'img[src*="kf/"]'];
+      const imageSelectors = ['.carousel-image', 'img[data-listing-image]', '.pdp-info-main-img img', '.magnifier-image', '.image-view-magnifier-wrap img', '.item-detail-img', 'img[src*="kf/"]'];
       for (const selector of imageSelectors) {
         const el = document.querySelector(selector);
         if (el) {
@@ -33,7 +33,21 @@ function getProductDetails() {
   }
   
   if (imageUrl) {
+      // Remove AliExpress suffixes like _640x640.jpg or _.webp to get the clean original image
       imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+      
+      // Ensure the URL ends exactly at .jpg or .png
+      const jpgIndex = imageUrl.toLowerCase().lastIndexOf('.jpg');
+      const pngIndex = imageUrl.toLowerCase().lastIndexOf('.png');
+      const validIndex = Math.max(jpgIndex, pngIndex);
+      
+      if (validIndex !== -1) {
+          imageUrl = imageUrl.substring(0, validIndex + 4);
+      }
+      
+      if (imageUrl.startsWith('//')) {
+          imageUrl = 'https:' + imageUrl;
+      }
   }
 
   let rating = 0;
@@ -101,7 +115,13 @@ function generateHashtags(title) {
     if (titleLower.includes('beauty') || titleLower.includes('makeup')) tags.add('#beautyhacks');
     if (titleLower.includes('toy') || titleLower.includes('baby') || titleLower.includes('kids')) tags.add('#momlife');
     if (titleLower.includes('car') || titleLower.includes('auto')) tags.add('#caraccessories');
-    tags.add('#tiktokmademebuyit');
+    if (titleLower.includes('template') || titleLower.includes('html') || titleLower.includes('web')) tags.add('#webdesign');
+    if (titleLower.includes('app') || titleLower.includes('ui') || titleLower.includes('mobile')) tags.add('#appdesign');
+    if (titleLower.includes('digital') || titleLower.includes('download')) tags.add('#digitaldownload');
+    
+    if (!titleLower.includes('template') && !titleLower.includes('html') && !titleLower.includes('app')) {
+        tags.add('#tiktokmademebuyit');
+    }
     return Array.from(tags).slice(0, 3).join(' ');
 }
 
@@ -113,6 +133,9 @@ function getBoardName(title) {
     if (titleLower.includes('beauty') || titleLower.includes('makeup')) return 'Beauty Hacks';
     if (titleLower.includes('toy') || titleLower.includes('baby') || titleLower.includes('kids')) return 'Kids & Mom Life';
     if (titleLower.includes('car') || titleLower.includes('auto')) return 'Car Accessories';
+    if (titleLower.includes('template') || titleLower.includes('html') || titleLower.includes('web')) return 'Web Design Templates';
+    if (titleLower.includes('app') || titleLower.includes('ui') || titleLower.includes('mobile')) return 'App Design & UI';
+    if (titleLower.includes('digital') || titleLower.includes('download')) return 'Digital Downloads';
     return 'Viral Finds';
 }
 
@@ -405,7 +428,7 @@ function extractTrackingIdFromPortals() {
 }
 
 // Check which page we are on
-if (window.location.href.includes('/item/') || window.location.href.includes('/i/')) {
+if (window.location.href.includes('/item/') || window.location.href.includes('/i/') || window.location.hostname.includes('etsy.com')) {
     // Item Page: Do nothing (wait for popup message)
 } else {
     // Search/Category/Portals Page: Run Prospecting Mode
@@ -413,4 +436,138 @@ if (window.location.href.includes('/item/') || window.location.href.includes('/i
         setInterval(extractTrackingIdFromPortals, 3000);
     }
     setInterval(findProductCards, 2000);
+
+    // Check if autopilot search automation is active
+    if (window.location.href.includes('autoProspect=true')) {
+        automateSearchScraping();
+    }
+}
+
+function automateSearchScraping() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoProspect = urlParams.get('autoProspect');
+  const keyword = urlParams.get('sourcingKeyword') || '';
+
+  if (autoProspect !== 'true') return;
+
+  console.log(`AliPin Autopilot: Automatically scraping search page for "${keyword}"`);
+
+  // Create an overlay to show status
+  const overlay = document.createElement('div');
+  overlay.innerText = `AliPin: Auto-sourcing products for "${keyword}"...`;
+  overlay.style.position = "fixed";
+  overlay.style.top = "15px";
+  overlay.style.left = "50%";
+  overlay.style.transform = "translateX(-50%)";
+  overlay.style.backgroundColor = "#28a745";
+  overlay.style.color = "white";
+  overlay.style.padding = "12px 24px";
+  overlay.style.borderRadius = "30px";
+  overlay.style.fontSize = "14px";
+  overlay.style.fontWeight = "bold";
+  overlay.style.boxShadow = "0 6px 16px rgba(0,0,0,0.3)";
+  overlay.style.zIndex = "2147483647";
+  overlay.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+  document.body.appendChild(overlay);
+
+  // Scroll down slowly to load lazy items (take 3 seconds)
+  let scrollY = 0;
+  const scrollTimer = setInterval(() => {
+    scrollY += window.innerHeight / 3;
+    window.scrollTo(0, scrollY);
+    if (scrollY >= window.innerHeight * 1.5) {
+      clearInterval(scrollTimer);
+      
+      // Perform extraction
+      extractTopProducts();
+    }
+  }, 400);
+
+  async function extractTopProducts() {
+    // Wait a brief moment for images to load after scroll
+    await new Promise(r => setTimeout(r, 1200));
+
+    const itemLinks = document.querySelectorAll('a[href*="/item/"], a[href*="/p/"]');
+    const matchedProducts = [];
+
+    itemLinks.forEach(link => {
+      // Find the main card container
+      let card = link.closest('div[class*="outWrapper"], div[class*="list--gallery"], div[class*="search-card-item"]');
+      
+      if (!card) {
+         let parent = link.parentElement;
+         for (let i = 0; i < 5; i++) {
+             if (parent && parent.innerText && (parent.innerText.toLowerCase().includes('sold') || parent.innerText.toLowerCase().includes('order'))) {
+                 card = parent;
+                 break;
+             }
+             if (parent) parent = parent.parentElement;
+         }
+      }
+      
+      if (card) {
+        const text = card.innerText.toLowerCase();
+        let orders = 0;
+        
+        // Extract sales from card text
+        const match = text.match(/(\d+[,.]?\d*[km]?)\+?\s*(sold|orders)/i);
+        if (match) {
+          let numStr = match[1].replace(/,/g, '');
+          let mult = 1;
+          if (numStr.includes('k')) { mult = 1000; numStr = numStr.replace('k', ''); }
+          if (numStr.includes('m')) { mult = 1000000; numStr = numStr.replace('m', ''); }
+          orders = parseFloat(numStr) * mult;
+        }
+
+        // We want winning products: orders >= 500
+        if (orders >= 500) {
+          let title = "";
+          const titleEl = card.querySelector('h1, h3, [class*="title--"]');
+          if (titleEl) title = titleEl.innerText.trim();
+          if (!title) {
+             const textNodes = Array.from(card.querySelectorAll('*')).map(el => el.innerText ? el.innerText.trim() : "").filter(t => t.length > 20);
+             if (textNodes.length > 0) title = textNodes[0];
+          }
+          
+          let imageUrl = "";
+          const allImgs = Array.from(card.querySelectorAll('img'));
+          let bestImg = null;
+          for (let img of allImgs) {
+             let src = img.src || img.dataset.src || "";
+             if (src.includes('data:image') || src.includes('.gif') || src.includes('lazyload') || src.includes('.svg') || src.includes('logo')) {
+                 continue;
+             }
+             if (src.includes('kf/')) {
+                 bestImg = img;
+                 break;
+             }
+             if (!bestImg) bestImg = img;
+          }
+          
+          if (bestImg) {
+             imageUrl = bestImg.src || bestImg.dataset.src || "";
+             if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
+             imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+          }
+
+          const productUrl = link.href.split('?')[0].split('#')[0];
+
+          if (title && imageUrl && productUrl) {
+            if (!matchedProducts.some(p => p.productUrl === productUrl)) {
+              matchedProducts.push({ title, imageUrl, productUrl, orders });
+            }
+          }
+        }
+      }
+    });
+
+    console.log(`AliPin Autopilot: Found ${matchedProducts.length} winning products for "${keyword}"`);
+    
+    // Send back to background
+    chrome.runtime.sendMessage({
+      action: "searchProductsScraped",
+      products: matchedProducts,
+      keyword: keyword
+    });
+  }
 }

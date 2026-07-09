@@ -1,38 +1,134 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  // Tab Navigation Elements
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const queueCountBadge = document.getElementById('queueCountBadge');
+
+  // General Settings Elements
   const trackingIdInput = document.getElementById('trackingId');
   const bridgeUrlInput = document.getElementById('bridgeUrl');
   const linkRoutingSelect = document.getElementById('linkRouting');
   const bridgeLinkGroup = document.getElementById('bridgeLinkGroup');
+  const btnSave = document.getElementById('btnSave');
   
+  // Collapsible Settings Toggle
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsContent = document.getElementById('settingsContent');
+  const settingsArrow = document.getElementById('settingsArrow');
+
+  // Product Assistant Elements
   const prodTitleInput = document.getElementById('prodTitle');
   const affLinkInput = document.getElementById('affLink');
   const pinDescInput = document.getElementById('pinDesc');
   const charCountSpan = document.getElementById('charCount');
-  
   const btnPin = document.getElementById('btnPin');
-  const btnSave = document.getElementById('btnSave');
+  const btnQueue = document.getElementById('btnQueue');
   const badge = document.getElementById('winningBadge');
-  
+
+  // Queue Tab Elements
+  const queueListContainer = document.getElementById('queueListContainer');
+  const btnClearQueue = document.getElementById('btnClearQueue');
+
+  // Autopilot Tab Elements
+  const autopilotEnabledCheckbox = document.getElementById('autopilotEnabled');
+  const statQueueCount = document.getElementById('statQueueCount');
+  const statCompletedCount = document.getElementById('statCompletedCount');
+  const sourcingModeSelect = document.getElementById('sourcingMode');
+  const customKeywordsGroup = document.getElementById('customKeywordsGroup');
+  const customKeywordsInput = document.getElementById('customKeywords');
+  const sourcingLimitSelect = document.getElementById('sourcingLimit');
+  const postingIntervalSelect = document.getElementById('postingInterval');
+  const btnTriggerAutopilot = document.getElementById('btnTriggerAutopilot');
+
   let productData = null;
   const LEGAL_TAGS = " #musthaves #viralgadgets #affiliate #ad";
 
-  // 1. Load Settings
-  chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl'], (result) => {
+  // --- 1. TAB NAVIGATION ---
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      
+      tabButtons.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+
+      if (tabId === 'tab-queue') {
+        renderQueue();
+      } else if (tabId === 'tab-autopilot') {
+        updateAutopilotStats();
+      }
+    });
+  });
+
+  // --- 2. COLLAPSIBLE SETTINGS PANEL ---
+  settingsToggle.addEventListener('click', () => {
+    const isOpen = settingsContent.classList.toggle('open');
+    settingsArrow.textContent = isOpen ? '▲' : '▼';
+  });
+
+  // --- 3. LOAD & SAVE SETTINGS ---
+  const settingsKeys = [
+    'trackingId', 'linkRouting', 'bridgeUrl', 
+    'autopilotEnabled', 'sourcingMode', 'customKeywords', 
+    'sourcingLimit', 'postingInterval', 'pinQueue'
+  ];
+
+  chrome.storage.local.get(settingsKeys, (result) => {
+    // General Settings
     if (result.trackingId) trackingIdInput.value = result.trackingId;
     if (result.linkRouting) {
       linkRoutingSelect.value = result.linkRouting;
       bridgeLinkGroup.style.display = result.linkRouting === 'bridge' ? 'block' : 'none';
     }
     if (result.bridgeUrl) bridgeUrlInput.value = result.bridgeUrl;
+
+    // Autopilot Settings
+    autopilotEnabledCheckbox.checked = !!result.autopilotEnabled;
+    if (result.sourcingMode) {
+      sourcingModeSelect.value = result.sourcingMode;
+      customKeywordsGroup.style.display = result.sourcingMode === 'custom' ? 'block' : 'none';
+    }
+    if (result.customKeywords) customKeywordsInput.value = result.customKeywords;
+    if (result.sourcingLimit) sourcingLimitSelect.value = result.sourcingLimit;
+    if (result.postingInterval) postingIntervalSelect.value = result.postingInterval;
+
+    // Badges update
+    const queue = result.pinQueue || [];
+    const pendingCount = queue.filter(item => item.status === 'queued').length;
+    queueCountBadge.textContent = pendingCount;
   });
 
-  // 2. Routing Selector Behavior
+  // Auto-save Autopilot Settings on change
+  const saveAutopilotSettings = () => {
+    chrome.storage.local.set({
+      autopilotEnabled: autopilotEnabledCheckbox.checked,
+      sourcingMode: sourcingModeSelect.value,
+      customKeywords: customKeywordsInput.value.trim(),
+      sourcingLimit: sourcingLimitSelect.value,
+      postingInterval: postingIntervalSelect.value
+    }, () => {
+      updateAutopilotStats();
+    });
+  };
+
+  autopilotEnabledCheckbox.addEventListener('change', saveAutopilotSettings);
+  sourcingModeSelect.addEventListener('change', () => {
+    customKeywordsGroup.style.display = sourcingModeSelect.value === 'custom' ? 'block' : 'none';
+    saveAutopilotSettings();
+  });
+  customKeywordsInput.addEventListener('input', saveAutopilotSettings);
+  sourcingLimitSelect.addEventListener('change', saveAutopilotSettings);
+  postingIntervalSelect.addEventListener('change', saveAutopilotSettings);
+
+  // Link Routing Selector Behavior
   linkRoutingSelect.addEventListener('change', () => {
     bridgeLinkGroup.style.display = linkRoutingSelect.value === 'bridge' ? 'block' : 'none';
     generateFinalLink();
   });
 
-  // 3. Save Settings Action
+  // Save General Settings button
   btnSave.addEventListener('click', () => {
     chrome.storage.local.set({ 
       trackingId: trackingIdInput.value.trim(),
@@ -45,11 +141,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // 4. Character Counter and Tag Enforcement
+  // --- 4. CHARACTER COUNTER & LEGAL DISCLOSURES ---
   const updateCharCount = () => {
     const len = pinDescInput.value.length;
     charCountSpan.textContent = `${len}/500`;
-    charCountSpan.style.color = len >= 500 ? '#E60023' : '#666';
+    charCountSpan.style.color = len >= 500 ? '#FF3D00' : '#9E9EAE';
   };
   
   pinDescInput.addEventListener('input', updateCharCount);
@@ -65,39 +161,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     return combined;
   }
 
-  // 5. Link Generation Engine
+  // --- 5. LINK GENERATION ENGINE ---
   function generateFinalLink() {
     if (!productData) return;
     
     let routingChoice = linkRoutingSelect.value;
-    let trackingId = trackingIdInput.value.trim() || '_pz9sEiR'; // Default format
+    let trackingId = trackingIdInput.value.trim() || '_pz9sEiR';
     
-    // Auto-extracted s.click link has highest priority if direct link is chosen
     if (routingChoice === 'direct' && productData.sClickUrl) {
       affLinkInput.value = productData.sClickUrl;
       return;
     }
     
     let finalLink = "";
-    
     if (routingChoice === 'direct') {
-      // Direct Affiliate Link using raw URL append
-      try {
-        const urlObj = new URL(productData.productUrl);
-        urlObj.searchParams.set('aff_platform', 'portals-promotion');
-        urlObj.searchParams.set('sk', trackingId);
-        finalLink = urlObj.toString();
-      } catch(e) {
-        finalLink = productData.productUrl + (productData.productUrl.includes('?') ? '&' : '?') + `aff_platform=portals-promotion&sk=${trackingId}`;
+      if (productData.productUrl.includes('aliexpress')) {
+        try {
+          const urlObj = new URL(productData.productUrl);
+          urlObj.searchParams.set('aff_platform', 'portals-promotion');
+          urlObj.searchParams.set('sk', trackingId);
+          finalLink = urlObj.toString();
+        } catch(e) {
+          finalLink = productData.productUrl + (productData.productUrl.includes('?') ? '&' : '?') + `aff_platform=portals-promotion&sk=${trackingId}`;
+        }
+      } else {
+        finalLink = productData.productUrl;
       }
     } else {
-      // Landing Page / Bridge Link
       let rootUrl = bridgeUrlInput.value.trim();
-      if (!rootUrl) rootUrl = "https://linktr.ee/yourprofile"; // Fallback placeholder
+      if (!rootUrl) rootUrl = "https://linktr.ee/yourprofile";
       
       const match = productData.productUrl.match(/\/(\d+)\.html/);
       const productId = match ? match[1] : 'ali_item';
-      
       finalLink = rootUrl + (rootUrl.includes('?') ? '&' : '?') + `product=${productId}`;
     }
     
@@ -111,12 +206,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     errSec.style.display = 'block';
   }
 
-  // 6. Connect to content.js and load product
+  // --- 6. SCRAPE ACTIVE TAB PRODUCT ---
   try {
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    if (tab && tab.url && tab.url.match(/aliexpress\.(com|us|ru)\/(item|i)\//)) {
-      // First, try to extract s.click link from ALL frames (in case SiteStripe is an iframe)
+    if (tab && tab.url && (tab.url.match(/aliexpress\.(com|us|ru)\/(item|i)\//) || tab.url.match(/etsy\.com\/([^\/]+\/)?listing\//))) {
       let globalSClickUrl = null;
       try {
         const results = await chrome.scripting.executeScript({
@@ -135,13 +229,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             let link = findLink();
             if (link) return link;
 
-            // Try to automate clicking the SiteStripe button
+            // SiteStripe button automation
             const buttons = Array.from(document.querySelectorAll('button, a, div[role="button"], span'));
             const getLinkBtn = buttons.find(b => b.innerText && (b.innerText.trim() === 'Get link' || b.innerText.trim() === 'Text'));
             
             if (getLinkBtn) {
               getLinkBtn.click();
-              // Poll for the link to generate (up to 3 seconds)
               for (let i = 0; i < 30; i++) {
                 await new Promise(r => setTimeout(r, 100));
                 link = findLink();
@@ -166,7 +259,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (response && response.title) {
           productData = response;
-          // Override with global s.click if found in any iframe
           if (globalSClickUrl) productData.sClickUrl = globalSClickUrl;
           
           function generateSeoTitle(rawTitle) {
@@ -184,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             badge.textContent = `🔥 Winning Product! (${productData.orders.toLocaleString()}+ Sold)`;
             badge.className = "badge winning";
           } else {
-            badge.textContent = `Normal Product (${productData.orders > 0 ? productData.orders.toLocaleString() : 'Few'} Sold)`;
+            badge.textContent = `Normal Niche Strength (${productData.orders > 0 ? productData.orders.toLocaleString() : 'Few'} Sold)`;
             badge.className = "badge";
           }
           
@@ -214,46 +306,319 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     } else {
-      showError("Please open an AliExpress product page to use this tool.");
+      showError("Please open an AliExpress or Etsy product page to use this tool.");
     }
   } catch (error) {
     showError("Extension Error: " + error.message);
   }
 
-  // 7. Pinterest Dispatcher
-  btnPin.addEventListener('click', () => {
+  // --- 7. MANUAL PINTEREST DISPATCHER ---
+  btnPin.addEventListener('click', async () => {
     if (!productData) {
       alert("No product data loaded.");
       return;
     }
 
-    // Auto copy board name
-    function getBoardName(title) {
-        const titleLower = title.toLowerCase();
+    btnPin.disabled = true;
+    btnPin.textContent = '⏳ Opening...';
+
+    let rawTitle = prodTitleInput.value;
+    let combinedDesc = "📌 " + rawTitle + "\n\n" + pinDescInput.value;
+    combinedDesc = enforceDisclosures(combinedDesc);
+    let finalLink = affLinkInput.value;
+
+    // Store pin data in session so content script can read affiliate link
+    await chrome.storage.session.set({
+      pendingPin: {
+        affLink: finalLink,
+        imageUrl: productData.imageUrl,
+        description: combinedDesc,
+        title: rawTitle,
+        board: null, // manual - user picks board themselves
+        pinId: null,
+        isAutoPin: false
+      }
+    });
+
+    // Open Pinterest bookmarklet page - url= is the destination/affiliate link
+    // Clean image URL to ensure it ends in .jpg or .png (Pinterest rejects complex/webp URLs)
+    let cleanImage = productData.imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+    const validIndex = Math.max(cleanImage.toLowerCase().lastIndexOf('.jpg'), cleanImage.toLowerCase().lastIndexOf('.png'));
+    if (validIndex !== -1) cleanImage = cleanImage.substring(0, validIndex + 4);
+
+    // Open Pinterest extension page - url= is the destination/affiliate link
+    // Note: using /extension/ instead of /button/ because /button/ requires a valid Referer header
+    // and blocks direct chrome.tabs.create() calls.
+    const safeDesc = combinedDesc.substring(0, 450);
+    const pinterestUrl = `https://www.pinterest.com/pin/create/extension/?url=${encodeURIComponent(finalLink)}&media=${encodeURIComponent(cleanImage)}&description=${encodeURIComponent(safeDesc)}`;
+    chrome.tabs.create({ url: pinterestUrl, active: true });
+
+    setTimeout(() => {
+      btnPin.disabled = false;
+      btnPin.textContent = 'Create Pin';
+    }, 2000);
+  });
+
+  // --- 8. MANUAL QUEUE ADDER ---
+  btnQueue.addEventListener('click', () => {
+    if (!productData) {
+      alert("No product data loaded.");
+      return;
+    }
+
+    const title = prodTitleInput.value.trim();
+    const link = affLinkInput.value.trim();
+    let desc = pinDescInput.value.trim();
+
+    if (!title || !link) {
+      alert("Please fill out Title and Link fields.");
+      return;
+    }
+
+    // Auto-generate board name
+    function getBoardName(t) {
+        const titleLower = t.toLowerCase();
         if (titleLower.includes('home') || titleLower.includes('kitchen') || titleLower.includes('decor')) return 'Home Decor Finds';
         if (titleLower.includes('gadget') || titleLower.includes('electronic') || titleLower.includes('usb')) return 'Tech Gadgets';
         if (titleLower.includes('beauty') || titleLower.includes('makeup')) return 'Beauty Hacks';
         if (titleLower.includes('toy') || titleLower.includes('baby') || titleLower.includes('kids')) return 'Kids & Mom Life';
         if (titleLower.includes('car') || titleLower.includes('auto')) return 'Car Accessories';
+        if (titleLower.includes('template') || titleLower.includes('html') || titleLower.includes('web')) return 'Web Design Templates';
+        if (titleLower.includes('app') || titleLower.includes('ui') || titleLower.includes('mobile')) return 'App Design & UI';
+        if (titleLower.includes('digital') || titleLower.includes('download')) return 'Digital Downloads';
         return 'Viral Finds';
     }
-    let rawTitle = prodTitleInput.value;
-    // Auto copy Title because Pinterest blocks it via URL
-    navigator.clipboard.writeText(rawTitle).catch(e => console.log('Copy failed'));
+    const board = getBoardName(productData.title);
     
-    let combinedDesc = "📌 " + rawTitle + "\n\n" + pinDescInput.value;
-    // Force compliance before sending
-    combinedDesc = enforceDisclosures(combinedDesc);
-    
-    let finalLink = affLinkInput.value;
-    
-    let pinTitle = encodeURIComponent(rawTitle);
-    
-    let pinLink = encodeURIComponent(finalLink);
-    let pinImage = encodeURIComponent(productData.imageUrl);
-    let pinDesc = encodeURIComponent(combinedDesc);
+    // Auto-append hashtags if not present
+    if (!desc.includes('#ad') && !desc.includes('#affiliate')) {
+      desc = enforceDisclosures("📌 " + title + "\n\n" + desc);
+    }
 
-    let pinterestUrl = `https://www.pinterest.com/pin/create/button/?url=${pinLink}&media=${pinImage}&description=${pinDesc}&title=${pinTitle}`;
-    window.open(pinterestUrl, '_blank', 'width=800,height=600');
+    chrome.storage.local.get(['pinQueue'], (result) => {
+      const queue = result.pinQueue || [];
+      
+      // Check duplicate
+      const isDuplicate = queue.some(item => item.productUrl === productData.productUrl && item.status === 'queued');
+      if (isDuplicate) {
+        alert("This product is already pending in the queue!");
+        return;
+      }
+
+      const newItem = {
+        id: 'pin_' + Date.now(),
+        title: title,
+        imageUrl: productData.imageUrl,
+        productUrl: productData.productUrl,
+        affLink: link,
+        description: desc,
+        board: board,
+        status: 'queued',
+        addedAt: Date.now()
+      };
+
+      queue.push(newItem);
+      chrome.storage.local.set({ pinQueue: queue }, () => {
+        // UI Feedback
+        btnQueue.textContent = "✔ Queued!";
+        btnQueue.style.backgroundColor = "#28a745";
+        btnQueue.style.color = "white";
+        
+        // Update header badge
+        const pendingCount = queue.filter(item => item.status === 'queued').length;
+        queueCountBadge.textContent = pendingCount;
+
+        setTimeout(() => {
+          btnQueue.textContent = "+ Queue";
+          btnQueue.style.backgroundColor = "";
+          btnQueue.style.color = "";
+        }, 1500);
+      });
+    });
+  });
+
+  // --- 9. QUEUE RENDERING ENGINE ---
+  function renderQueue() {
+    chrome.storage.local.get(['pinQueue'], (result) => {
+      const queue = result.pinQueue || [];
+      queueListContainer.innerHTML = "";
+
+      // Sort: processing first, then queued, then failed, then completed. Newest added at top.
+      const statusWeight = { 'processing': 0, 'queued': 1, 'failed': 2, 'completed': 3 };
+      const sortedQueue = [...queue].sort((a, b) => {
+        if (statusWeight[a.status] !== statusWeight[b.status]) {
+          return statusWeight[a.status] - statusWeight[b.status];
+        }
+        return b.addedAt - a.addedAt;
+      });
+
+      // Update all count badges
+      const queuedCount   = queue.filter(item => item.status === 'queued').length;
+      const doneCount     = queue.filter(item => item.status === 'completed').length;
+      const failedCount   = queue.filter(item => item.status === 'failed').length;
+      queueCountBadge.textContent = queuedCount;
+      const qStat = document.getElementById('queueStatQueued');
+      const dStat = document.getElementById('queueStatDone');
+      const fStat = document.getElementById('queueStatFailed');
+      if (qStat) qStat.textContent = queuedCount;
+      if (dStat) dStat.textContent = doneCount;
+      if (fStat) fStat.textContent = failedCount;
+
+      if (sortedQueue.length === 0) {
+        queueListContainer.innerHTML = '<div class="empty-queue">No items in pinning queue.</div>';
+        return;
+      }
+
+      sortedQueue.forEach(item => {
+        const row = document.createElement('div');
+        row.className = "queue-item";
+        
+        const img = document.createElement('img');
+        img.className = "queue-thumb";
+        img.src = item.imageUrl || "placeholder.png";
+        
+        const details = document.createElement('div');
+        details.className = "queue-details";
+        
+        const title = document.createElement('div');
+        title.className = "queue-title";
+        title.textContent = item.title;
+        
+        const sub = document.createElement('div');
+        sub.className = "queue-board";
+        
+        // Status Badge
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `queue-status-badge ${item.status}`;
+        statusBadge.textContent = item.status;
+        if (item.status === 'failed' && item.error) {
+          statusBadge.title = `Error: ${item.error}`;
+        }
+        
+        sub.appendChild(statusBadge);
+        if (item.sourcedFrom) {
+          const originSpan = document.createElement('span');
+          originSpan.style.color = "var(--success)";
+          originSpan.style.fontSize = "9px";
+          originSpan.style.marginLeft = "6px";
+          originSpan.style.fontWeight = "600";
+          originSpan.textContent = `[Trend: ${item.sourcedFrom}]`;
+          sub.appendChild(originSpan);
+        }
+        sub.appendChild(document.createTextNode(`  •  ${item.board}`));
+        
+        details.appendChild(title);
+        details.appendChild(sub);
+
+        // --- Pin Now Button (manual post to Pinterest) ---
+        const pinNowBtn = document.createElement('button');
+        pinNowBtn.className = "queue-pin-btn";
+        pinNowBtn.innerHTML = "📌";
+        pinNowBtn.title = "Pin this product to Pinterest now";
+        // Only allow pinning queued or failed items; completed already done, processing is in-flight
+        if (item.status === 'processing') {
+          pinNowBtn.disabled = true;
+          pinNowBtn.title = "Currently being pinned...";
+        }
+        pinNowBtn.addEventListener('click', () => {
+          pinNowBtn.textContent = "✓";
+          pinNowBtn.disabled = true;
+          openPinterestForItem(item);
+        });
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = "queue-remove-btn";
+        removeBtn.innerHTML = "✖";
+        removeBtn.title = "Remove item";
+        removeBtn.addEventListener('click', () => {
+          removeItemFromQueue(item.id);
+        });
+
+        row.appendChild(img);
+        row.appendChild(details);
+        row.appendChild(pinNowBtn);
+        row.appendChild(removeBtn);
+        
+        queueListContainer.appendChild(row);
+      });
+    });
+  }
+
+  // Open Pinterest pin creation page for a specific queue item (manual trigger)
+  async function openPinterestForItem(item) {
+    // Store pin data in session storage so content script can reliably read it
+    // (Pinterest's React router strips query params after hydration)
+    await chrome.storage.session.set({
+      pendingPin: {
+        affLink: item.affLink || item.productUrl,
+        imageUrl: item.imageUrl,
+        description: item.description || item.title,
+        title: item.title,
+        board: item.board || 'Viral Finds',
+        pinId: item.id
+      }
+    });
+    const pinterestUrl = `https://www.pinterest.com/pin/creation/?autoPin=true&pinId=${item.id}`;
+    chrome.tabs.create({ url: pinterestUrl, active: true });
+  }
+
+  function removeItemFromQueue(itemId) {
+    chrome.storage.local.get(['pinQueue'], (result) => {
+      let queue = result.pinQueue || [];
+      queue = queue.filter(item => item.id !== itemId);
+      chrome.storage.local.set({ pinQueue: queue }, () => {
+        renderQueue();
+      });
+    });
+  }
+
+  // Clear completed and failed queue items
+  btnClearQueue.addEventListener('click', () => {
+    chrome.storage.local.get(['pinQueue'], (result) => {
+      let queue = result.pinQueue || [];
+      // Keep only queued and processing items
+      queue = queue.filter(item => item.status === 'queued' || item.status === 'processing');
+      chrome.storage.local.set({ pinQueue: queue }, () => {
+        renderQueue();
+      });
+    });
+  });
+
+  // --- 10. AUTOPILOT DASHBOARD STATS ---
+  function updateAutopilotStats() {
+    chrome.storage.local.get(['pinQueue'], (result) => {
+      const queue = result.pinQueue || [];
+      
+      const queuedCount = queue.filter(item => item.status === 'queued').length;
+      statQueueCount.textContent = queuedCount;
+      queueCountBadge.textContent = queuedCount;
+
+      // Count completed items in the last 24 hours
+      const last24h = Date.now() - (24 * 60 * 60 * 1000);
+      const completedToday = queue.filter(item => item.status === 'completed' && item.completedAt && item.completedAt >= last24h).length;
+      statCompletedCount.textContent = completedToday;
+    });
+  }
+
+  // Manually Trigger Autopilot
+  btnTriggerAutopilot.addEventListener('click', () => {
+    btnTriggerAutopilot.disabled = true;
+    const originalText = btnTriggerAutopilot.textContent;
+    btnTriggerAutopilot.textContent = "⏳ Running Sourcing...";
+    btnTriggerAutopilot.style.opacity = "0.7";
+
+    chrome.runtime.sendMessage({ action: "triggerAutopilotNow" }, (response) => {
+      console.log("Autopilot sourcing manual run response:", response);
+      
+      setTimeout(() => {
+        btnTriggerAutopilot.disabled = false;
+        btnTriggerAutopilot.textContent = originalText;
+        btnTriggerAutopilot.style.opacity = "";
+        
+        // Show success alert in popup
+        alert("Autopilot search sequence started! Running in background tabs. Do not close browser.");
+        updateAutopilotStats();
+      }, 1500);
+    });
   });
 });

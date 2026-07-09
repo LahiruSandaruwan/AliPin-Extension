@@ -1,17 +1,34 @@
 {
   "manifest_version": 3,
-  "name": "AliPin - AliExpress to Pinterest Affiliate Assistant",
-  "version": "1.0.0",
-  "description": "Generate AliExpress affiliate links and create Pinterest pins instantly.",
+  "name": "AliPin & Etsy - Affiliate & Seller Assistant",
+  "version": "1.1.0",
+  "description": "Generate AliExpress affiliate links and create Pinterest pins instantly for both AliExpress and Etsy products.",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "alarms",
+    "tabs"
   ],
+  "host_permissions": [
+    "https://trends.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.aliexpress.com/w/*",
+        "*://*.aliexpress.us/w/*",
+        "*://*.aliexpress.ru/w/*"
+      ],
+      "js": ["sourcing_optimizer.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "*://*.aliexpress.com/item/*",
@@ -29,9 +46,19 @@
         "*://*.aliexpress.ru/w/*",
         "*://*.aliexpress.ru/category/*",
         "*://*.aliexpress.ru/store/*",
-        "*://portals.aliexpress.com/*"
+        "*://portals.aliexpress.com/*",
+        "*://*.etsy.com/listing/*",
+        "*://*.etsy.com/*/listing/*"
       ],
       "js": ["content.js"]
+    },
+    {
+      "matches": [
+        "*://*.pinterest.com/pin/create/extension/*",
+        "*://trends.pinterest.com/*"
+      ],
+      "js": ["pinterest_automation.js"],
+      "run_at": "document_idle"
     }
   ]
 }
