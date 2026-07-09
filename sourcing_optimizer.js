@@ -6,10 +6,9 @@ if (window.location.href.includes('autoProspect=true')) {
   // (CSP meta tags must be inside <head> so we use CSS instead, which works at document_start.)
   const style = document.createElement('style');
   style.textContent = [
-    'img, video, iframe,',
+    'video, iframe,',
     '[class*="video"], [class*="player"],',
-    '[class*="gallery"], [class*="carousel"],',
-    '[class*="image"], [class*="thumb"]',
+    '[class*="carousel"]',
     '{ display: none !important; }'
   ].join(' ');
   document.documentElement.appendChild(style);

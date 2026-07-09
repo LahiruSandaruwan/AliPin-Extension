@@ -8,11 +8,25 @@
     "storage",
     "scripting",
     "alarms",
-    "tabs"
+    "tabs",
+    "cookies",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
-    "https://trends.google.com/*"
+    "https://trends.google.com/*",
+    "*://*.pinterest.com/*",
+    "*://*.aliexpress.com/*"
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -55,6 +69,8 @@
     {
       "matches": [
         "*://*.pinterest.com/pin/create/extension/*",
+        "*://*.pinterest.com/pin-builder/*",
+        "*://*.pinterest.com/pin/creation/*",
         "*://trends.pinterest.com/*"
       ],
       "js": ["pinterest_automation.js"],

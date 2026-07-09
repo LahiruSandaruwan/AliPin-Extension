@@ -37,7 +37,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 async function initializeSettings() {
   const defaults = {
-    trackingId: '_pz9sEiR', // Default tracker format
+    trackingId: '_c3PWNQIr', // Default tracker format
     linkRouting: 'direct',
     bridgeUrl: 'https://linktr.ee/yourprofile',
     autopilotEnabled: false,
@@ -120,47 +120,55 @@ async function processNextPin() {
     queue[queuedItemIndex].status = 'processing';
     await chrome.storage.local.set({ pinQueue: queue });
 
-    // Store in session storage for content script to pick up board + pinId
-    await chrome.storage.session.set({
-      pendingPin: {
-        affLink: item.affLink,
-        imageUrl: item.imageUrl,
-        description: item.description,
-        title: item.title,
-        board: item.board,
-        pinId: item.id,
-        isAutoPin: true
-      }
-    });
+    // Fetch Pinterest session cookie to send to the backend
+    let pinterestCookie = '';
+    try {
+      const cookie = await chrome.cookies.get({ url: 'https://www.pinterest.com', name: '_pinterest_sess' });
+      if (cookie) pinterestCookie = cookie.value;
+    } catch (e) {
+      console.warn("Could not read Pinterest cookie", e);
+    }
 
-    // Clean image URL to ensure it ends in .jpg or .png (Pinterest rejects complex/webp URLs)
+    // Clean image URL to ensure it ends in .jpg or .png
     let cleanImage = item.imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
     const validIndex = Math.max(cleanImage.toLowerCase().lastIndexOf('.jpg'), cleanImage.toLowerCase().lastIndexOf('.png'));
     if (validIndex !== -1) cleanImage = cleanImage.substring(0, validIndex + 4);
 
-    // Open Pinterest extension page — url= IS the affiliate destination link on the pin.
-    // Params pre-fill the image and description.
-    // Note: removed &title= and &autoPin= as unknown parameters cause Pinterest to redirect to home page.
-    const safeDesc = item.description.substring(0, 450);
-    const pinterestUrl = `https://www.pinterest.com/pin/create/extension/`
-      + `?url=${encodeURIComponent(item.affLink)}`
-      + `&media=${encodeURIComponent(cleanImage)}`
-      + `&description=${encodeURIComponent(safeDesc)}`;
+    const payload = {
+      affLink: item.affLink,
+      imageUrl: cleanImage,
+      description: item.description,
+      title: item.title,
+      board: item.board,
+      pinId: item.id,
+      pinterestCookie: pinterestCookie
+    };
 
     try {
-      const tab = await chrome.tabs.create({ url: pinterestUrl, active: true });
-      activePinningTabId = tab.id;
-      activePinningId = item.id;
+      // Send to local Node.js backend
+      const response = await fetch('http://localhost:3333/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-      // Register a safety timeout (45 seconds) in case page fails to load or clicker hangs
-      if (pinningTimeoutId) clearTimeout(pinningTimeoutId);
-      pinningTimeoutId = setTimeout(() => {
-        handlePinFailure(item.id, "Pinning session timed out.");
-      }, 45000);
+      if (!response.ok) {
+        throw new Error('Backend returned status ' + response.status);
+      }
 
-    } catch (err) {
-      console.error("AliPin: Failed to open Pinterest tab", err);
-      handlePinFailure(item.id, "Failed to open Pinterest window.");
+      console.log(`AliPin: Successfully sent pin ${item.id} to backend.`);
+      
+      // Remove from Chrome queue since backend has taken ownership
+      queue.splice(queuedItemIndex, 1);
+      await chrome.storage.local.set({ pinQueue: queue });
+      updateBadge(queue.length);
+      
+    } catch (error) {
+      console.error("AliPin: Failed to send pin to backend:", error);
+      // Mark failed so it doesn't get stuck processing
+      queue[queuedItemIndex].status = 'failed';
+      queue[queuedItemIndex].error = 'Could not reach backend daemon';
+      await chrome.storage.local.set({ pinQueue: queue });
     }
   });
 }
@@ -463,7 +471,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function processAndQueueSourcedProducts(products, keyword) {
   chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl', 'pinQueue'], async (result) => {
     const queue = result.pinQueue || [];
-    const trackingId = result.trackingId || '_pz9sEiR';
+    const trackingId = result.trackingId || '_c3PWNQIr';
     const routing = result.linkRouting || 'direct';
     const bridgeUrl = result.bridgeUrl || 'https://linktr.ee/yourprofile';
 
@@ -510,6 +518,15 @@ function processAndQueueSourcedProducts(products, keyword) {
         const match = prod.productUrl.match(/\/(\d+)\.html/);
         const productId = match ? match[1] : 'ali_item';
         finalLink = bridgeUrl + (bridgeUrl.includes('?') ? '&' : '?') + `product=${productId}`;
+      }
+
+      // Shorten the affiliate link to prevent Pinterest from stripping tracking params
+      if (finalLink.includes('aliexpress.com') && !finalLink.includes('s.click')) {
+        try {
+            const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(finalLink)}`);
+            const data = await res.json();
+            if (data && data.shorturl) finalLink = data.shorturl;
+        } catch(e) { console.warn("Shortener failed in background.js"); }
       }
 
       // Generate title & descriptions

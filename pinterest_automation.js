@@ -242,19 +242,33 @@
     if (pinData.isAutoPin !== true) {
       console.log('AliPin: Manual pin page open. No automation — user will interact.');
       
-      // We can still try to auto-fill the title for manual pins since the URL doesn't support the title parameter
-      if (pinData.title) {
-         setTimeout(() => {
-           const titleInput = document.querySelector('input[name="title"], input[placeholder*="title" i], input[aria-label*="title" i]');
-           if (titleInput) {
-             titleInput.focus();
-             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-             if (nativeSetter && nativeSetter.set) nativeSetter.set.call(titleInput, pinData.title.substring(0, 100));
-             else titleInput.value = pinData.title.substring(0, 100);
-             titleInput.dispatchEvent(new Event('input', { bubbles: true }));
-           }
-         }, 4000);
-      }
+      // We can still try to auto-fill the title and affiliate link for manual pins 
+      // since the URL doesn't support the title parameter, and we passed a dummy URL for the link.
+      setTimeout(() => {
+        // Fill Title
+        if (pinData.title) {
+          const titleInput = document.querySelector('input[name="title"], input[placeholder*="title" i], input[aria-label*="title" i]');
+          if (titleInput) {
+            titleInput.focus();
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+            if (nativeSetter && nativeSetter.set) nativeSetter.set.call(titleInput, pinData.title.substring(0, 100));
+            else titleInput.value = pinData.title.substring(0, 100);
+            titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        
+        // Fill Affiliate Link (Destination Link)
+        if (pinData.affLink) {
+          const linkInput = document.querySelector('input[name="link"], input[name="url"], input[placeholder*="link" i], input[aria-label*="link" i]');
+          if (linkInput) {
+            linkInput.focus();
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+            if (nativeSetter && nativeSetter.set) nativeSetter.set.call(linkInput, pinData.affLink);
+            else linkInput.value = pinData.affLink;
+            linkInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      }, 4000);
       return;
     }
 

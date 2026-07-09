@@ -185,7 +185,7 @@ function triggerQuickPin(title, imageUrl, productUrl) {
 
     // 2. Load settings and open Pinterest
     chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl'], (result) => {
-        let trackingId = result.trackingId || '_pz9sEiR'; // Default to a valid format example
+        let trackingId = result.trackingId || '_c3PWNQIr'; // Default to a valid format example
         let routingChoice = result.linkRouting || 'direct';
         let finalLink = "";
         
@@ -399,7 +399,7 @@ function findProductCards() {
 function extractTrackingIdFromPortals() {
     // Try to find tracking ID from common places in Portals (like text, generated links, etc)
     const pageText = document.body.innerText;
-    // Look for standard AliExpress tracking ID pattern like _pz9sEiR
+    // Look for standard AliExpress tracking ID pattern like _c3PWNQIr
     const match = pageText.match(/\b(_[a-zA-Z0-9]{5,10})\b/);
     if (match) {
         chrome.storage.local.get(['trackingId'], (result) => {
@@ -548,6 +548,12 @@ function automateSearchScraping() {
              imageUrl = bestImg.src || bestImg.dataset.src || "";
              if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
              imageUrl = imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+          }
+          
+          // Skip if no valid image was found (prevents queuing logos)
+          if (!imageUrl || !imageUrl.includes('kf/')) {
+             console.log("AliPin: Skipped product due to missing valid product image");
+             return;
           }
 
           const productUrl = link.href.split('?')[0].split('#')[0];

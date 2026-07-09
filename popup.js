@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!productData) return;
     
     let routingChoice = linkRoutingSelect.value;
-    let trackingId = trackingIdInput.value.trim() || '_pz9sEiR';
+    let trackingId = trackingIdInput.value.trim() || '_c3PWNQIr';
     
     if (routingChoice === 'direct' && productData.sClickUrl) {
       affLinkInput.value = productData.sClickUrl;
@@ -325,7 +325,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     let rawTitle = prodTitleInput.value;
     let combinedDesc = "📌 " + rawTitle + "\n\n" + pinDescInput.value;
     combinedDesc = enforceDisclosures(combinedDesc);
+    
+    // Shorten the affiliate link to prevent Pinterest from stripping the tracking parameters
     let finalLink = affLinkInput.value;
+    if (finalLink.includes('aliexpress.com') && !finalLink.includes('s.click')) {
+        try {
+            const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(finalLink)}`);
+            const data = await res.json();
+            if (data && data.shorturl) finalLink = data.shorturl;
+        } catch(e) { console.warn("Shortener failed"); }
+    }
 
     // Store pin data in session so content script can read affiliate link
     await chrome.storage.session.set({
@@ -343,14 +352,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Open Pinterest bookmarklet page - url= is the destination/affiliate link
     // Clean image URL to ensure it ends in .jpg or .png (Pinterest rejects complex/webp URLs)
     let cleanImage = productData.imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
-    const validIndex = Math.max(cleanImage.toLowerCase().lastIndexOf('.jpg'), cleanImage.toLowerCase().lastIndexOf('.png'));
-    if (validIndex !== -1) cleanImage = cleanImage.substring(0, validIndex + 4);
-
-    // Open Pinterest extension page - url= is the destination/affiliate link
-    // Note: using /extension/ instead of /button/ because /button/ requires a valid Referer header
-    // and blocks direct chrome.tabs.create() calls.
+    // Open Pinterest extension page
+    // We send the affiliate link directly in the URL parameter.
+    // NOTE: declarativeNetRequest rules in background automatically spoof the Referer header
+    // to https://www.aliexpress.com/ which bypasses Pinterest's show_error=true spam block.
     const safeDesc = combinedDesc.substring(0, 450);
     const pinterestUrl = `https://www.pinterest.com/pin/create/extension/?url=${encodeURIComponent(finalLink)}&media=${encodeURIComponent(cleanImage)}&description=${encodeURIComponent(safeDesc)}`;
+    
+    // Open in a new tab normally
     chrome.tabs.create({ url: pinterestUrl, active: true });
 
     setTimeout(() => {
@@ -547,7 +556,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Open Pinterest pin creation page for a specific queue item (manual trigger)
   async function openPinterestForItem(item) {
     // Store pin data in session storage so content script can reliably read it
-    // (Pinterest's React router strips query params after hydration)
     await chrome.storage.session.set({
       pendingPin: {
         affLink: item.affLink || item.productUrl,
@@ -558,7 +566,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         pinId: item.id
       }
     });
-    const pinterestUrl = `https://www.pinterest.com/pin/creation/?autoPin=true&pinId=${item.id}`;
+
+    let cleanImage = item.imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
+    const validIndex = Math.max(cleanImage.toLowerCase().lastIndexOf('.jpg'), cleanImage.toLowerCase().lastIndexOf('.png'));
+    if (validIndex !== -1) cleanImage = cleanImage.substring(0, validIndex + 4);
+
+    const safeDesc = (item.description || item.title).substring(0, 450);
+    
+    // Shorten the affiliate link to prevent Pinterest from stripping the tracking parameters
+    let affiliateUrl = item.affLink || item.productUrl;
+    if (affiliateUrl.includes('aliexpress.com') && !affiliateUrl.includes('s.click')) {
+        try {
+            const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(affiliateUrl)}`);
+            const data = await res.json();
+            if (data && data.shorturl) affiliateUrl = data.shorturl;
+        } catch(e) { console.warn("Shortener failed"); }
+    }
+    
+    const pinterestUrl = `https://www.pinterest.com/pin/create/extension/?url=${encodeURIComponent(affiliateUrl)}&media=${encodeURIComponent(cleanImage)}&description=${encodeURIComponent(safeDesc)}`;
     chrome.tabs.create({ url: pinterestUrl, active: true });
   }
 
