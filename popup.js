@@ -38,6 +38,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const customKeywordsInput = document.getElementById('customKeywords');
   const sourcingLimitSelect = document.getElementById('sourcingLimit');
   const postingIntervalSelect = document.getElementById('postingInterval');
+  
+  // Video Elements
+  const autoYoutubeCb = document.getElementById('autoYoutube');
+  const youtubeCookieInput = document.getElementById('youtubeCookie');
+  const autoTiktokCb = document.getElementById('autoTiktok');
+  const tiktokCookieInput = document.getElementById('tiktokCookie');
+  const autoLinktreeCb = document.getElementById('autoLinktree');
+  const linktreeCookieInput = document.getElementById('linktreeCookie');
   const btnTriggerAutopilot = document.getElementById('btnTriggerAutopilot');
 
   let productData = null;
@@ -72,7 +80,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsKeys = [
     'trackingId', 'linkRouting', 'bridgeUrl', 
     'autopilotEnabled', 'sourcingMode', 'customKeywords', 
-    'sourcingLimit', 'postingInterval', 'pinQueue'
+    'sourcingLimit', 'postingInterval', 'pinQueue',
+    'autoYoutube', 'autoTiktok', 'youtubeCookie', 'tiktokCookie',
+    'autoLinktree', 'linktreeCookie'
   ];
 
   chrome.storage.local.get(settingsKeys, (result) => {
@@ -94,6 +104,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (result.sourcingLimit) sourcingLimitSelect.value = result.sourcingLimit;
     if (result.postingInterval) postingIntervalSelect.value = result.postingInterval;
 
+    // Video Settings
+    autoYoutubeCb.checked = result.autoYoutube !== false; // default true
+    if (result.youtubeCookie) youtubeCookieInput.value = result.youtubeCookie;
+    youtubeCookieInput.style.display = autoYoutubeCb.checked ? 'block' : 'none';
+
+    autoTiktokCb.checked = result.autoTiktok !== false; // default true
+    if (result.tiktokCookie) tiktokCookieInput.value = result.tiktokCookie;
+    tiktokCookieInput.style.display = autoTiktokCb.checked ? 'block' : 'none';
+
+    autoLinktreeCb.checked = result.autoLinktree !== false; // default true
+    if (result.linktreeCookie) linktreeCookieInput.value = result.linktreeCookie;
+    linktreeCookieInput.style.display = autoLinktreeCb.checked ? 'block' : 'none';
+
     // Badges update
     const queue = result.pinQueue || [];
     const pendingCount = queue.filter(item => item.status === 'queued').length;
@@ -107,7 +130,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       sourcingMode: sourcingModeSelect.value,
       customKeywords: customKeywordsInput.value.trim(),
       sourcingLimit: sourcingLimitSelect.value,
-      postingInterval: postingIntervalSelect.value
+      postingInterval: postingIntervalSelect.value,
+      autoYoutube: autoYoutubeCb.checked,
+      youtubeCookie: youtubeCookieInput.value.trim(),
+      autoTiktok: autoTiktokCb.checked,
+      tiktokCookie: tiktokCookieInput.value.trim(),
+      autoLinktree: autoLinktreeCb.checked,
+      linktreeCookie: linktreeCookieInput.value.trim()
     }, () => {
       updateAutopilotStats();
     });
@@ -121,6 +150,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   customKeywordsInput.addEventListener('input', saveAutopilotSettings);
   sourcingLimitSelect.addEventListener('change', saveAutopilotSettings);
   postingIntervalSelect.addEventListener('change', saveAutopilotSettings);
+  
+  autoYoutubeCb.addEventListener('change', () => {
+    youtubeCookieInput.style.display = autoYoutubeCb.checked ? 'block' : 'none';
+    saveAutopilotSettings();
+  });
+  youtubeCookieInput.addEventListener('input', saveAutopilotSettings);
+  
+  autoTiktokCb.addEventListener('change', () => {
+    tiktokCookieInput.style.display = autoTiktokCb.checked ? 'block' : 'none';
+    saveAutopilotSettings();
+  });
+  tiktokCookieInput.addEventListener('input', saveAutopilotSettings);
+
+  autoLinktreeCb.addEventListener('change', () => {
+    linktreeCookieInput.style.display = autoLinktreeCb.checked ? 'block' : 'none';
+    saveAutopilotSettings();
+  });
+  linktreeCookieInput.addEventListener('input', saveAutopilotSettings);
 
   // Link Routing Selector Behavior
   linkRoutingSelect.addEventListener('change', () => {

@@ -469,7 +469,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // --- 6. AUTO-QUEUE GENERATION LOGIC ---
 function processAndQueueSourcedProducts(products, keyword) {
-  chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl', 'pinQueue'], async (result) => {
+  chrome.storage.local.get(['trackingId', 'linkRouting', 'bridgeUrl', 'pinQueue', 'autoYoutube', 'autoTiktok', 'youtubeCookie', 'tiktokCookie', 'autoLinktree', 'linktreeCookie'], async (result) => {
     const queue = result.pinQueue || [];
     const trackingId = result.trackingId || '_c3PWNQIr';
     const routing = result.linkRouting || 'direct';
@@ -553,6 +553,21 @@ function processAndQueueSourcedProducts(products, keyword) {
 
       queue.push(queueItem);
       itemsQueuedCount++;
+
+      // Trigger Video Generation & Upload
+      if (result.autoYoutube || result.autoTiktok || result.autoLinktree) {
+        const videoPayload = {
+          ...queueItem,
+          youtubeCookie: result.autoYoutube ? result.youtubeCookie : null,
+          tiktokCookie: result.autoTiktok ? result.tiktokCookie : null,
+          linktreeCookie: result.autoLinktree ? result.linktreeCookie : null
+        };
+        fetch('http://localhost:3333/api/video-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(videoPayload)
+        }).catch(err => console.warn("[Video API Error]", err));
+      }
     }
 
     if (itemsQueuedCount > 0) {

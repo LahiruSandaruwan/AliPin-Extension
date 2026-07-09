@@ -2,7 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { startPinnerService } = require('./pinner');
+const puppeteer = require('puppeteer');
+const { pinToPinterest, startPinnerService } = require('./pinner');
+const { createProductVideo } = require('./video_maker');
+const { uploadToYouTubeShorts } = require('./youtube_uploader');
+const { uploadToTikTok } = require('./tiktok_uploader');
+const { uploadToLinktree } = require('./linktree_uploader');
 
 const app = express();
 app.use(cors());
@@ -35,8 +40,41 @@ app.post('/api/queue', (req, res) => {
         console.log(`[Queue] Added new pin to queue: ${pinData.title}`);
         res.status(200).json({ success: true, queueLength: currentQueue.length });
     } catch (error) {
-        console.error('[Queue] Error writing to queue:', error);
-        res.status(500).json({ error: 'Failed to queue pin' });
+        console.error("Pinterest Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Endpoint to generate video and upload to TikTok / YouTube
+app.post('/api/video-upload', async (req, res) => {
+    try {
+        const pinData = req.body;
+        console.log(`[Server] Received Video Request for: ${pinData.title}`);
+
+        // 1. Generate Video
+        const videoPath = await createProductVideo(pinData);
+
+        // 2. Upload to YouTube (if cookie provided)
+        if (pinData.youtubeCookie) {
+            uploadToYouTubeShorts(pinData, videoPath).catch(e => console.error("YT Error:", e));
+        }
+
+        // 3. Upload to TikTok (if cookie provided)
+        if (pinData.tiktokCookie) {
+            uploadToTikTok(pinData, videoPath).catch(e => console.error("TikTok Error:", e));
+        }
+
+        // 4. Update Linktree (if cookie provided)
+        if (pinData.linktreeCookie) {
+            uploadToLinktree(pinData).catch(e => console.error("Linktree Error:", e));
+        }
+
+        // We return success immediately so the extension doesn't hang waiting for long uploads
+        res.json({ success: true, message: 'Video generation and uploads started in background.' });
+        
+    } catch (error) {
+        console.error("Video Error:", error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
