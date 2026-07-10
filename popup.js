@@ -256,6 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     let finalLink = "";
     if (routingChoice === 'direct') {
+      // Direct Affiliate Link using raw URL append
       if (productData.productUrl.includes('aliexpress')) {
         try {
           const urlObj = new URL(productData.productUrl);
@@ -292,6 +293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     if (tab && tab.url && (tab.url.match(/aliexpress\.(com|us|ru)\/(item|i)\//) || tab.url.match(/etsy\.com\/([^\/]+\/)?listing\//))) {
+      // First, try to extract s.click link from ALL frames (in case SiteStripe is an iframe)
       let globalSClickUrl = null;
       try {
         const results = await chrome.scripting.executeScript({
