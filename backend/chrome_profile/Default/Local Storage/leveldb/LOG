@@ -1,0 +1,8 @@
+2026/07/10-15:46:34.253 105b7 Creating DB /media/lahiru-sandaruwan/New Volume/Developments/AliPin/backend/chrome_profile/Default/Local Storage/leveldb since it was missing.
+2026/07/10-15:46:34.405 105b7 Reusing MANIFEST /media/lahiru-sandaruwan/New Volume/Developments/AliPin/backend/chrome_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/07/10-15:47:34.409 105b7 Level-0 table #5: started
+2026/07/10-15:47:34.432 105b7 Level-0 table #5: 116641 bytes OK
+2026/07/10-15:47:34.467 105b7 Delete type=0 #3
+2026/07/10-15:49:43.821 105b9 Level-0 table #7: started
+2026/07/10-15:49:43.856 105b9 Level-0 table #7: 205994 bytes OK
+2026/07/10-15:49:43.891 105b9 Delete type=0 #4

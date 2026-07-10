@@ -41,11 +41,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Video Elements
   const autoYoutubeCb = document.getElementById('autoYoutube');
-  const youtubeCookieInput = document.getElementById('youtubeCookie');
+  const btnConnectYoutube = document.getElementById('btnConnectYoutube');
   const autoTiktokCb = document.getElementById('autoTiktok');
-  const tiktokCookieInput = document.getElementById('tiktokCookie');
+  const btnConnectTiktok = document.getElementById('btnConnectTiktok');
   const autoLinktreeCb = document.getElementById('autoLinktree');
-  const linktreeCookieInput = document.getElementById('linktreeCookie');
+  const btnConnectLinktree = document.getElementById('btnConnectLinktree');
   const btnTriggerAutopilot = document.getElementById('btnTriggerAutopilot');
 
   let productData = null;
@@ -75,6 +75,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isOpen = settingsContent.classList.toggle('open');
     settingsArrow.textContent = isOpen ? '▲' : '▼';
   });
+
+  // --- Cookie Extraction Helper ---
+  async function connectPlatform(domain, buttonElement, storageKey, platformName) {
+    if (!chrome.cookies) {
+      buttonElement.textContent = "Error: No Cookie Permission";
+      return;
+    }
+    buttonElement.textContent = "Connecting...";
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: domain });
+      if (cookies && cookies.length > 0) {
+        chrome.storage.local.set({ [storageKey]: JSON.stringify(cookies) });
+        buttonElement.textContent = `✅ Connected!`;
+        buttonElement.style.background = "#28a745";
+        buttonElement.style.color = "white";
+        buttonElement.style.border = "none";
+      } else {
+        buttonElement.textContent = "❌ Not Logged In";
+        buttonElement.style.background = "#dc3545";
+      }
+    } catch (e) {
+      buttonElement.textContent = "❌ Error";
+    }
+    setTimeout(() => {
+      // Revert text after 3 seconds, keep color
+      buttonElement.textContent = buttonElement.textContent.includes("Connected") ? `🔄 Reconnect ${platformName}` : `Connect ${platformName}`;
+    }, 3000);
+  }
 
   // --- 3. LOAD & SAVE SETTINGS ---
   const settingsKeys = [
@@ -106,16 +134,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Video Settings
     autoYoutubeCb.checked = result.autoYoutube !== false; // default true
-    if (result.youtubeCookie) youtubeCookieInput.value = result.youtubeCookie;
-    youtubeCookieInput.style.display = autoYoutubeCb.checked ? 'block' : 'none';
+    btnConnectYoutube.style.display = autoYoutubeCb.checked ? 'block' : 'none';
+    if (result.youtubeCookie && result.youtubeCookie.length > 5) {
+      btnConnectYoutube.textContent = "🔄 Reconnect YouTube";
+      btnConnectYoutube.style.background = "#28a745";
+    }
 
     autoTiktokCb.checked = result.autoTiktok !== false; // default true
-    if (result.tiktokCookie) tiktokCookieInput.value = result.tiktokCookie;
-    tiktokCookieInput.style.display = autoTiktokCb.checked ? 'block' : 'none';
+    btnConnectTiktok.style.display = autoTiktokCb.checked ? 'block' : 'none';
+    if (result.tiktokCookie && result.tiktokCookie.length > 5) {
+      btnConnectTiktok.textContent = "🔄 Reconnect TikTok";
+      btnConnectTiktok.style.background = "#28a745";
+    }
 
     autoLinktreeCb.checked = result.autoLinktree !== false; // default true
-    if (result.linktreeCookie) linktreeCookieInput.value = result.linktreeCookie;
-    linktreeCookieInput.style.display = autoLinktreeCb.checked ? 'block' : 'none';
+    btnConnectLinktree.style.display = autoLinktreeCb.checked ? 'block' : 'none';
+    if (result.linktreeCookie && result.linktreeCookie.length > 5) {
+      btnConnectLinktree.textContent = "🔄 Reconnect Linktree";
+      btnConnectLinktree.style.background = "#28a745";
+    }
 
     // Badges update
     const queue = result.pinQueue || [];
@@ -132,11 +169,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       sourcingLimit: sourcingLimitSelect.value,
       postingInterval: postingIntervalSelect.value,
       autoYoutube: autoYoutubeCb.checked,
-      youtubeCookie: youtubeCookieInput.value.trim(),
       autoTiktok: autoTiktokCb.checked,
-      tiktokCookie: tiktokCookieInput.value.trim(),
-      autoLinktree: autoLinktreeCb.checked,
-      linktreeCookie: linktreeCookieInput.value.trim()
+      autoLinktree: autoLinktreeCb.checked
     }, () => {
       updateAutopilotStats();
     });
@@ -152,22 +186,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   postingIntervalSelect.addEventListener('change', saveAutopilotSettings);
   
   autoYoutubeCb.addEventListener('change', () => {
-    youtubeCookieInput.style.display = autoYoutubeCb.checked ? 'block' : 'none';
+    btnConnectYoutube.style.display = autoYoutubeCb.checked ? 'block' : 'none';
     saveAutopilotSettings();
   });
-  youtubeCookieInput.addEventListener('input', saveAutopilotSettings);
+  btnConnectYoutube.addEventListener('click', () => connectPlatform('.youtube.com', btnConnectYoutube, 'youtubeCookie', 'YouTube'));
   
   autoTiktokCb.addEventListener('change', () => {
-    tiktokCookieInput.style.display = autoTiktokCb.checked ? 'block' : 'none';
+    btnConnectTiktok.style.display = autoTiktokCb.checked ? 'block' : 'none';
     saveAutopilotSettings();
   });
-  tiktokCookieInput.addEventListener('input', saveAutopilotSettings);
+  btnConnectTiktok.addEventListener('click', () => connectPlatform('.tiktok.com', btnConnectTiktok, 'tiktokCookie', 'TikTok'));
 
   autoLinktreeCb.addEventListener('change', () => {
-    linktreeCookieInput.style.display = autoLinktreeCb.checked ? 'block' : 'none';
+    btnConnectLinktree.style.display = autoLinktreeCb.checked ? 'block' : 'none';
     saveAutopilotSettings();
   });
-  linktreeCookieInput.addEventListener('input', saveAutopilotSettings);
+  btnConnectLinktree.addEventListener('click', () => connectPlatform('.linktr.ee', btnConnectLinktree, 'linktreeCookie', 'Linktree'));
 
   // Link Routing Selector Behavior
   linkRoutingSelect.addEventListener('change', () => {
@@ -579,7 +613,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         pinNowBtn.addEventListener('click', () => {
           pinNowBtn.textContent = "✓";
           pinNowBtn.disabled = true;
-          openPinterestForItem(item);
+          
+          // Force status to queued if it was failed, so processNextPin can pick it up
+          chrome.storage.local.get(['pinQueue'], (result) => {
+            const currentQueue = result.pinQueue || [];
+            const idx = currentQueue.findIndex(q => q.id === item.id);
+            if (idx !== -1) {
+              currentQueue[idx].status = 'queued';
+              chrome.storage.local.set({ pinQueue: currentQueue }, () => {
+                // Tell background to dispatch THIS item to the backend immediately
+                chrome.runtime.sendMessage({ action: 'processManualPin', pinId: item.id });
+              });
+            }
+          });
         });
         
         const removeBtn = document.createElement('button');

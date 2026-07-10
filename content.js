@@ -519,8 +519,8 @@ function automateSearchScraping() {
           orders = parseFloat(numStr) * mult;
         }
 
-        // We want winning products: orders >= 500
-        if (orders >= 500) {
+        // We want winning products: orders >= 10 (reduced from 500 so it captures more items)
+        if (orders >= 10) {
           let title = "";
           const titleEl = card.querySelector('h1, h3, [class*="title--"]');
           if (titleEl) title = titleEl.innerText.trim();

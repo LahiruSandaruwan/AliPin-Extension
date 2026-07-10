@@ -1,14 +1,28 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const fs = require('fs');
+const path = require('path');
+
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
 async function uploadToTikTok(pinData, videoPath) {
-    if (!pinData.tiktokCookie) {
-        console.warn("[TikTok] No TikTok cookie provided. Skipping.");
+    if (!videoPath) {
+        console.warn("[TikTok] Missing video. Skipping.");
         return;
     }
 
     console.log(`[TikTok] Starting upload for ${pinData.title}...`);
+    
+    const executablePaths = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser'
+    ];
+    let chromePath = executablePaths.find(fs.existsSync);
+    if (!chromePath) throw new Error("Chrome/Chromium not found on this system.");
+
     const browser = await puppeteer.launch({
+        executablePath: chromePath,
         headless: "new",
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,800']
     });
@@ -30,47 +44,71 @@ async function uploadToTikTok(pinData, videoPath) {
         try {
             cookies = JSON.parse(pinData.tiktokCookie);
             if (!Array.isArray(cookies)) cookies = [cookies];
+
+            // Strictly extract only fields that Puppeteer accepts
+            cookies = cookies.map(c => ({
+                name: c.name,
+                value: c.value,
+                domain: c.domain,
+                path: c.path || '/',
+                secure: c.secure || true,
+                httpOnly: c.httpOnly || false
+            }));
         } catch(e) {
             cookies = [{
                 name: 'sessionid',
                 value: pinData.tiktokCookie,
-                domain: '.tiktok.com'
+                domain: '.tiktok.com',
+                path: '/',
+                secure: true
             }];
         }
         await page.setCookie(...cookies);
 
-        await page.goto('https://www.tiktok.com/creator-center/upload', { waitUntil: 'networkidle2' });
+        try {
+            await page.goto('https://www.tiktok.com/creator-center/upload', { waitUntil: 'domcontentloaded', timeout: 90000 });
+        } catch(err) {
+            console.log("[TikTok] Goto timed out, but proceeding to check if page loaded...");
+        }
         
-        // Wait for iframe if present (TikTok sometimes puts the uploader in an iframe)
-        await page.waitForTimeout(5000);
+        await delay(5000);
         const loginCheck = await page.content();
         if (loginCheck.includes('Log in')) {
-            throw new Error("TikTok session expired or invalid cookie.");
+            throw new Error("TikTok session expired. Please click the 'Connect TikTok' button in the extension popup again.");
         }
 
         console.log("[TikTok] Logged in. Initiating upload...");
         
-        // Find file input and upload
-        // Note: TikTok web uploader DOM changes frequently, this is a generic selector
-        const fileInputs = await page.$$('input[type="file"]');
-        if (fileInputs.length === 0) {
-            // Try inside iframe
-            const frames = await page.frames();
-            for (let f of frames) {
-                const fInput = await f.$$('input[type="file"]');
-                if (fInput.length > 0) {
-                    await fInput[0].uploadFile(videoPath);
-                    break;
+        let fileInputHandle = null;
+        for (let i = 0; i < 6; i++) { // Wait up to 30 seconds
+            const fileInputs = await page.$$('input[type="file"]');
+            if (fileInputs.length > 0) {
+                fileInputHandle = fileInputs[0];
+                break;
+            } else {
+                const frames = await page.frames();
+                for (let f of frames) {
+                    const fInput = await f.$$('input[type="file"]');
+                    if (fInput.length > 0) {
+                        fileInputHandle = fInput[0];
+                        break;
+                    }
                 }
             }
-        } else {
-            await fileInputs[0].uploadFile(videoPath);
+            if (fileInputHandle) break;
+            await delay(5000);
+            console.log("[TikTok] Waiting for file input...");
         }
 
-        console.log("[TikTok] File selected. Waiting for upload...");
-        await page.waitForTimeout(10000);
+        if (!fileInputHandle) {
+            throw new Error("TikTok upload interface not found.");
+        }
+        
+        await fileInputHandle.uploadFile(videoPath);
 
-        // Fill caption (Find the contenteditable div for the Draft.js editor)
+        console.log("[TikTok] File selected. Waiting for upload...");
+        await delay(10000);
+
         const captionEditor = await page.$('.public-DraftEditor-content');
         if (captionEditor) {
             await captionEditor.click({ clickCount: 3 });
@@ -83,7 +121,6 @@ async function uploadToTikTok(pinData, videoPath) {
             await captionEditor.type(captionText);
         }
 
-        // Click Post
         console.log("[TikTok] Clicking Post...");
         const postButton = await page.$('button[data-e2e="post-button"], .btn-post');
         if (postButton) {
@@ -91,7 +128,7 @@ async function uploadToTikTok(pinData, videoPath) {
             console.log("[TikTok] Video Published!");
         }
 
-        await page.waitForTimeout(5000);
+        await delay(5000);
 
     } catch (err) {
         console.error("[TikTok] Upload failed:", err.message);

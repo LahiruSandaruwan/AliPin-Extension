@@ -103,10 +103,16 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 // --- 3. AUTO-PINNING RUNNER ---
-async function processNextPin() {
-  chrome.storage.local.get(['pinQueue', 'autopilotEnabled'], async (result) => {
+async function processNextPin(targetPinId = null) {
+  chrome.storage.local.get(['pinQueue', 'autopilotEnabled', 'autoYoutube', 'youtubeCookie', 'autoTiktok', 'tiktokCookie', 'autoLinktree', 'linktreeCookie'], async (result) => {
     const queue = result.pinQueue || [];
-    const queuedItemIndex = queue.findIndex(item => item.status === 'queued');
+    
+    let queuedItemIndex = -1;
+    if (targetPinId) {
+       queuedItemIndex = queue.findIndex(item => item.id === targetPinId);
+    } else {
+       queuedItemIndex = queue.findIndex(item => item.status === 'queued');
+    }
 
     if (queuedItemIndex === -1) {
       console.log("AliPin: No queued pins found.");
@@ -120,14 +126,24 @@ async function processNextPin() {
     queue[queuedItemIndex].status = 'processing';
     await chrome.storage.local.set({ pinQueue: queue });
 
-    // Fetch Pinterest session cookie to send to the backend
+    // Fetch all cookies needed for the backend
     let pinterestCookie = '';
+    let youtubeCookie = '';
+    let tiktokCookie = '';
+    let linktreeCookie = '';
+    
     try {
       const cookie = await chrome.cookies.get({ url: 'https://www.pinterest.com', name: '_pinterest_sess' });
       if (cookie) pinterestCookie = cookie.value;
     } catch (e) {
       console.warn("Could not read Pinterest cookie", e);
     }
+
+    try {
+      youtubeCookie = result.youtubeCookie || null;
+      tiktokCookie = result.tiktokCookie || null;
+      linktreeCookie = result.linktreeCookie || null;
+    } catch(e) {}
 
     // Clean image URL to ensure it ends in .jpg or .png
     let cleanImage = item.imageUrl.replace(/_[0-9]+x[0-9]+.*\.jpg/i, '');
@@ -141,7 +157,10 @@ async function processNextPin() {
       title: item.title,
       board: item.board,
       pinId: item.id,
-      pinterestCookie: pinterestCookie
+      pinterestCookie: pinterestCookie,
+      youtubeCookie: result.autoYoutube ? youtubeCookie : null,
+      tiktokCookie: result.autoTiktok ? tiktokCookie : null,
+      linktreeCookie: result.autoLinktree ? linktreeCookie : null
     };
 
     try {
@@ -161,7 +180,7 @@ async function processNextPin() {
       // Remove from Chrome queue since backend has taken ownership
       queue.splice(queuedItemIndex, 1);
       await chrome.storage.local.set({ pinQueue: queue });
-      updateBadge(queue.length);
+      chrome.action.setBadgeText({ text: queue.length > 0 ? queue.length.toString() : '' });
       
     } catch (error) {
       console.error("AliPin: Failed to send pin to backend:", error);
@@ -241,13 +260,11 @@ async function triggerTrendSourcing() {
         
         if (trendsTimeoutId) clearTimeout(trendsTimeoutId);
         trendsTimeoutId = setTimeout(() => {
-          console.warn("AliPin: Pinterest Trends scraping timed out. Falling back to Google Trends.");
+          console.warn("AliPin: Pinterest Trends scraping timed out. Scraping aborted (No fallback to Google/All categories per user request).");
           closeTrendsTab();
-          fallbackToGoogleTrends(limit);
         }, 45000);
       } catch (err) {
-        console.error("AliPin: Failed to open trends page. Falling back to Google Trends.", err);
-        fallbackToGoogleTrends(limit);
+        console.error("AliPin: Failed to open trends page. Aborting.", err);
       }
     } else if (mode === 'google') {
       // 2. Direct Google Trends RSS fetch
@@ -331,10 +348,8 @@ async function fallbackToGoogleTrends(limit) {
     }
   }
 
-  // All network sources failed — use hardcoded evergreen keyword list as last resort
-  console.warn("AliPin: All trend sources failed. Using hardcoded evergreen keyword fallback.");
-  const shuffled = [...FALLBACK_KEYWORDS].sort(() => Math.random() - 0.5);
-  startAliExpressSourcing(shuffled.slice(0, limit));
+  // All network sources failed
+  console.warn("AliPin: Google Trends sources failed.");
 }
 
 // Coordinator for sequencing AliExpress searches
@@ -414,10 +429,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           startAliExpressSourcing(keywords.slice(0, limit));
         });
       } else {
-        // Fallback if scraping trends page returned empty
-        chrome.storage.local.get(['sourcingLimit'], (result) => {
-          fallbackToGoogleTrends(parseInt(result.sourcingLimit) || 5);
-        });
+        console.warn("AliPin: Pinterest Trends scraping returned empty. Aborting (No fallback).");
       }
     }
   }
@@ -458,7 +470,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 
-  // 5. Force Manual Run of Autopilot from Popup
+  // 5. Manual dispatch to backend
+  else if (message.action === 'processManualPin') {
+    if (message.pinId) {
+      processNextPin(message.pinId);
+    }
+  }
+  // 6. Force Manual Run of Autopilot from Popup
   else if (message.action === 'triggerAutopilotNow') {
     triggerTrendSourcing();
     sendResponse({ status: "Autopilot Sourcing Started" });
@@ -488,10 +506,13 @@ function processAndQueueSourcedProducts(products, keyword) {
 
     for (const prod of productsToProcess) {
       // Check if product is already in queue to prevent duplicate pins
+      const seoTitle = generateSeoTitle(prod.title);
       const isDuplicate = queue.some(item => {
         const itemMatch = item.productUrl.match(/\/(\d+)\.html/) || [];
         const prodMatch = prod.productUrl.match(/\/(\d+)\.html/) || [];
-        return (itemMatch[1] && prodMatch[1] && itemMatch[1] === prodMatch[1]) || item.productUrl === prod.productUrl;
+        const urlMatch = (itemMatch[1] && prodMatch[1] && itemMatch[1] === prodMatch[1]) || item.productUrl === prod.productUrl;
+        const titleMatch = item.title === seoTitle;
+        return urlMatch || titleMatch;
       });
 
       if (isDuplicate) {
@@ -529,8 +550,7 @@ function processAndQueueSourcedProducts(products, keyword) {
         } catch(e) { console.warn("Shortener failed in background.js"); }
       }
 
-      // Generate title & descriptions
-      const seoTitle = generateSeoTitle(prod.title);
+      // Generate descriptions
       const rawDesc = generateSmartDescription(prod.title);
       
       const hashtags = generateHashtags(prod.title);
@@ -554,20 +574,7 @@ function processAndQueueSourcedProducts(products, keyword) {
       queue.push(queueItem);
       itemsQueuedCount++;
 
-      // Trigger Video Generation & Upload
-      if (result.autoYoutube || result.autoTiktok || result.autoLinktree) {
-        const videoPayload = {
-          ...queueItem,
-          youtubeCookie: result.autoYoutube ? result.youtubeCookie : null,
-          tiktokCookie: result.autoTiktok ? result.tiktokCookie : null,
-          linktreeCookie: result.autoLinktree ? result.linktreeCookie : null
-        };
-        fetch('http://localhost:3333/api/video-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(videoPayload)
-        }).catch(err => console.warn("[Video API Error]", err));
-      }
+      // Video generation is now handled by the backend after successful Pinterest pin.
     }
 
     if (itemsQueuedCount > 0) {

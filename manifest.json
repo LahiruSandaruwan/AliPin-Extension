@@ -16,7 +16,10 @@
   "host_permissions": [
     "https://trends.google.com/*",
     "*://*.pinterest.com/*",
-    "*://*.aliexpress.com/*"
+    "*://*.aliexpress.com/*",
+    "*://*.youtube.com/*",
+    "*://*.tiktok.com/*",
+    "*://*.linktr.ee/*"
   ],
   "declarative_net_request": {
     "rule_resources": [
